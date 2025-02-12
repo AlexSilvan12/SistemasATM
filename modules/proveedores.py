@@ -30,14 +30,14 @@ def ventana_gestion_proveedores():
 
             messagebox.showinfo("Éxito", "Proveedor registrado correctamente.")
             limpiar_formulario()
-            cargar_proveedores()
+            cargar_proveedor()
 
             cursor.close()
             conexion.close()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo registrar el proveedor: {e}")
 
-    def cargar_proveedores():
+    def cargar_proveedor():
         for row in tree.get_children():
             tree.delete(row)
 
