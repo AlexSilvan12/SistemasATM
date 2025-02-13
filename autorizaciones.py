@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from modules.database import conectar_bd
-from modules.proveedores import cargar_proveedores as cargar_prov
+from database import conectar_bd
+import proveedores
 from openpyxl import load_workbook
 
 def ventana_gestion_autorizaciones():
@@ -42,7 +42,7 @@ def ventana_gestion_autorizaciones():
 
             messagebox.showinfo("Éxito", "Autorización registrada correctamente y guardada en Excel.")
             limpiar_formulario()
-            cargar_prov()
+            proveedores.cargar_proveedores()
 
             cursor.close()
             conexion.close()
@@ -141,7 +141,7 @@ def ventana_gestion_autorizaciones():
     entry_observaciones.grid(row=12, column=1, padx=10, pady=5)
 
     tk.Label(ventana, text="Proveedor:").grid(row=13, column=0, padx=10, pady=5)
-    combo_proveedor = ttk.Combobox(ventana, values=[cargar_prov()])
+    combo_proveedor = ttk.Combobox(ventana, values=[proveedores.cargar_proveedores()])
     combo_proveedor.grid(row=13, column=1, padx=10, pady=5)
 
     tk.Label(ventana, text="Instruccion: ").grid(row=14, column=0, padx=10, pady=5)
@@ -149,6 +149,6 @@ def ventana_gestion_autorizaciones():
     combo_instruccion.grid(row=14, column=1, padx=10, pady=5)
 
     tk.Button(ventana, text="Registrar Autorización", command=agregar_autorizacion).grid(row=15, column=0, columnspan=2, pady=10)
-    cargar_prov()
+    proveedores.cargar_proveedores()
 
 

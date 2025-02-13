@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
-from modules.database import conectar_bd
-from modules.main_menu import ventana_menu_principal
+from database import conectar_bd
+from main_menu import ventana_menu_principal
 import bcrypt
 
 def ventana_login():

@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from modules.database import conectar_bd
+from database import conectar_bd
 
 # Ventana para la gestión de proveedores
 def ventana_gestion_proveedores():

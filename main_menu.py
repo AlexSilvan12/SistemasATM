@@ -1,8 +1,8 @@
 import tkinter as tk
-from modules.usuarios import ventana_gestion_usuarios
-from modules.proveedores import ventana_gestion_proveedores
-from modules.autorizaciones import ventana_gestion_autorizaciones
-from modules.solicitudes import ventana_gestion_solicitudes_pago
+from usuarios import ventana_gestion_usuarios
+from proveedores import ventana_gestion_proveedores
+from autorizaciones import ventana_gestion_autorizaciones
+from solicitudes import ventana_gestion_solicitudes_pago
 
 def ventana_menu_principal(rol):
     menu = tk.Tk()

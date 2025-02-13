@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from modules.database import conectar_bd
+from database import conectar_bd
 from openpyxl import load_workbook
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
