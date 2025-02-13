@@ -38,7 +38,7 @@ def ventana_login():
 
     root = tk.Tk()
     root.title("Inicio de Sesión")
-    root.geometry("300x200")
+    root.geometry("1300x700")
 
     tk.Label(root, text="Correo electrónico:").pack(pady=5)
     entry_email = tk.Entry(root, width=30)
