@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 from database import conectar_bd
 from openpyxl import load_workbook
 from reportlab.lib.pagesizes import letter
@@ -10,9 +10,8 @@ import os
 TEMPLATE_PATH = "Solicitud_Pago.xlsx"
 
 # Ventana para la gestión de solicitudes de pago
-def ventana_gestion_solicitudes_pago():
-    def cargar_autorizaciones():
-        try:
+def cargar_autorizaciones():
+    try:
             conexion = conectar_bd()
             cursor = conexion.cursor()
             cursor.execute("SELECT id_autorizacion FROM AutorizacionesCompra")
@@ -20,45 +19,46 @@ def ventana_gestion_solicitudes_pago():
             combo_autorizacion['values'] = [f"{a[0]} - {a[1]}" for a in autorizaciones]
             cursor.close()
             conexion.close()
-        except Exception as e:
+    except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las autorizaciones: {e}")
 
-    def generar_documentos():
-        id_autorizacion = combo_autorizacion.get().split(" - ")[0]
+def generar_documentos():
+    id_autorizacion = combo_autorizacion.get().split(" - ")[0]
 
-        if not id_autorizacion:
+    if not id_autorizacion:
             messagebox.showwarning("Selección requerida", "Por favor, selecciona una autorización de compra.")
-            return
+    return
 
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-            cursor.execute("""
-                SELECT a.id_autorizacion, a.fecha_solicitud, a.monto, a.proyecto_contrato, a.articulo, a.instruccion,
-                       p.nombre, p.rfc, p.email, p.clave_bancaria, p.cuenta_bancaria, p.banco
-                FROM AutorizacionesCompra a
-                JOIN Proveedores p ON a.id_proveedor = p.id_proveedor
-                WHERE a.id_autorizacion = %s
+    try:
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT a.id_autorizacion, a.fecha_solicitud, a.monto, a.proyecto_contrato, a.articulo, a.instruccion,
+                   p.nombre, p.rfc, p.email, p.clave_bancaria, p.cuenta_bancaria, p.banco
+            FROM AutorizacionesCompra a
+            JOIN Proveedores p ON a.id_proveedor = p.id_proveedor
+            WHERE a.id_autorizacion = %s
             """, (id_autorizacion,))
-            datos = cursor.fetchone()
+        datos = cursor.fetchone()
 
-            if not datos:
+        if not datos:
                 messagebox.showerror("Error", "No se encontraron datos para la autorización seleccionada.")
-                return
+        return
 
-            (id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
-             nombre_proveedor, rfc, email, clave_bancaria, cuenta_bancaria, banco) = datos
+        (id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
+        nombre_proveedor, rfc, email, clave_bancaria, cuenta_bancaria, banco) = datos
             
-            generar_excel(id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
+        generar_excel(id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
                           nombre_proveedor, rfc, email, clave_bancaria, cuenta_bancaria, banco)
             
-            messagebox.showinfo("Éxito", "Los documentos han sido generados correctamente.")
-            cursor.close()
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo generar los documentos: {e}")
+        messagebox.showinfo("Éxito", "Los documentos han sido generados correctamente.")
+        cursor.close()
+        conexion.close()
 
-    def generar_excel(id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo generar los documentos: {e}")
+
+def generar_excel(id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
                        nombre_proveedor, rfc, email, clave_bancaria, cuenta_bancaria, banco):
         try:
             workbook = load_workbook(TEMPLATE_PATH)
@@ -82,17 +82,3 @@ def ventana_gestion_solicitudes_pago():
             os.startfile(file_path)  # Abrir automáticamente el archivo
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar el archivo Excel: {e}")
-
-
-    ventana = tk.Toplevel()
-    ventana.title("Gestión de Solicitudes de Pago")
-    ventana.geometry("600x400")
-
-    tk.Label(ventana, text="Autorización de compra:").grid(row=0, column=0, padx=10, pady=5)
-    combo_autorizacion = ttk.Combobox(ventana)
-    combo_autorizacion.grid(row=0, column=1, padx=10, pady=5)
-
-    tk.Button(ventana, text="Generar Documentos", command=generar_documentos).grid(row=1, column=0, columnspan=2, pady=10)
-    cargar_autorizaciones()
-
-
