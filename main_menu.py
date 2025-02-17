@@ -11,8 +11,8 @@ def abrir_menu(root):
     menu.title("Menú Principal")
     menu.geometry("400x300")
 
-    usuario = ""  # Simulación de usuario logueado
-    password = ""  # Simulación de contraseña
+    usuario = "admin@example.com"  # Simulación de usuario logueado
+    password = "admin123"  # Simulación de contraseña
     rol = ventana_login(usuario, password)
 
     if rol == "Administrador":

@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from database import conectar_bd
-from UI.main_menu import ventana_menu_principal
+from main_menu import abrir_menu
 import bcrypt
 
 def ventana_login():
@@ -25,7 +25,7 @@ def ventana_login():
                 if bcrypt.checkpw(password.encode('utf-8'), hashed_password.encode('utf-8')):
                     messagebox.showinfo("Acceso permitido", f"Bienvenido, rol: {rol}")
                     root.destroy()
-                    ventana_menu_principal(rol)
+                    abrir_menu(rol)
                 else:
                     messagebox.showerror("Acceso denegado", "Contraseña incorrecta.")
             else:

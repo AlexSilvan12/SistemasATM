@@ -1,6 +1,6 @@
-import tkinter as tk
 from tkinter import messagebox
 from database import conectar_bd
+import autorizaciones
 from openpyxl import load_workbook
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -16,18 +16,19 @@ def cargar_autorizaciones():
             cursor = conexion.cursor()
             cursor.execute("SELECT id_autorizacion FROM AutorizacionesCompra")
             autorizaciones = cursor.fetchall()
-            combo_autorizacion['values'] = [f"{a[0]} - {a[1]}" for a in autorizaciones]
+            autorizaciones.combo_autorizacion['values'] = [f"{a[0]} - {a[1]}" for a in autorizaciones]
             cursor.close()
             conexion.close()
     except Exception as e:
             messagebox.showerror("Error", f"No se pudieron cargar las autorizaciones: {e}")
 
 def generar_documentos():
-    id_autorizacion = combo_autorizacion.get().split(" - ")[0]
+    id_autorizacion = autorizaciones.combo_autorizacion.get().split(" - ")[0]
 
     if not id_autorizacion:
-            messagebox.showwarning("Selección requerida", "Por favor, selecciona una autorización de compra.")
-    return
+        messagebox.showwarning("Selección requerida", "Por favor, selecciona una autorización de compra.")
+        return
+    
 
     try:
         conexion = conectar_bd()
@@ -43,7 +44,7 @@ def generar_documentos():
 
         if not datos:
                 messagebox.showerror("Error", "No se encontraron datos para la autorización seleccionada.")
-        return
+        
 
         (id_autorizacion, fecha_solicitud, monto, proyecto_contrato, articulo, instruccion,
         nombre_proveedor, rfc, email, clave_bancaria, cuenta_bancaria, banco) = datos

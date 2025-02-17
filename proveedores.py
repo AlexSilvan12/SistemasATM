@@ -33,9 +33,14 @@ def agregar_proveedor(nombre, rfc, email, banco, clave_bancaria, cuenta_bancaria
 def cargar_proveedores():
     try:
         conexion = conectar_bd()
+        query = "SELECT * FROM proveedores"
         cursor = conexion.cursor()
-        cursor.execute("SELECT id_proveedor, nombre, rfc, email, banco FROM Proveedores")
+        cursor.execute(query)
         proveedores = cursor.fetchall()
+
+        for row in proveedores:
+             print (row)
+             
         cursor.close()
         conexion.close()
         return proveedores
