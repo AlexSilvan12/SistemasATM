@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 from database import conectar_bd
 import proveedores
 from openpyxl import load_workbook
@@ -42,7 +42,9 @@ def generar_excel(id_autorizacion, tipo, solicitante, puesto, area, fecha_solici
         sheet["H6"] = id_autorizacion
         sheet["B3"] = tipo
         sheet["C12"] = solicitante
+        sheet["A39"] = solicitante
         sheet["C13"] = puesto
+        sheet["A40"] = puesto
         sheet["C14"] = area
         sheet["G12"] = fecha_solicitud
         sheet["G13"] = fecha_requerida
