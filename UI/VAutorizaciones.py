@@ -1,10 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-#import database
-import proveedores
+from proveedores import cargar_proveedores
+from autorizaciones import agregar_autorizacion
 
 def ventana_gestion_autorizaciones():
-   
 
     ventana = tk.Toplevel()
     ventana.title("Gestión de Autorizaciones de Compra")
@@ -56,12 +55,12 @@ def ventana_gestion_autorizaciones():
     entry_observaciones = tk.Entry(ventana)
     entry_observaciones.grid(row=12, column=1, padx=10, pady=5)
     tk.Label(ventana, text="Proveedor:").grid(row=13, column=0, padx=10, pady=5)  
-    combo_proveedor = ttk.Combobox(ventana, values=[proveedores.cargar_proveedores()])
+    combo_proveedor = ttk.Combobox(ventana, values=[cargar_proveedores()])
     combo_proveedor.grid(row=13, column=1, padx=10, pady=5)
 
     tk.Label(ventana, text="Instruccion: ").grid(row=14, column=0, padx=10, pady=5)
     combo_instruccion = ttk.Combobox(ventana, values=["Transferencia Electronica", "Tarjeta de Debito", "Efectivo"])
     combo_instruccion.grid(row=14, column=1, padx=10, pady=5)
 
-    tk.Button(ventana, text="Registrar Autorización", command=proveedores.agregar_autorizacion).grid(row=15, column=0, columnspan=2, pady=10)
-    proveedores.cargar_proveedores()
+    tk.Button(ventana, text="Registrar Autorización", command=agregar_autorizacion).grid(row=15, column=0, columnspan=2, pady=10)
+    cargar_proveedores()

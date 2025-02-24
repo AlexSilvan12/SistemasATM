@@ -10,17 +10,19 @@ import os
 TEMPLATE_PATH = "Solicitud_Pago.xlsx"
 
 # Ventana para la gestión de solicitudes de pago
-def cargar_autorizaciones():
+def cargar_solicitudes():
     try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-            cursor.execute("SELECT id_autorizacion FROM AutorizacionesCompra")
-            autorizaciones = cursor.fetchall()
-            autorizaciones.combo_autorizacion['values'] = [f"{a[0]} - {a[1]}" for a in autorizaciones]
-            cursor.close()
-            conexion.close()
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        cursor.execute("SELECT id_solicitud, fecha_solicitud, monto, proyecto_contrato FROM SolicitudesPago")
+        solicitudes = cursor.fetchall()
+        cursor.close()
+        conexion.close()
+        return solicitudes
     except Exception as e:
-            messagebox.showerror("Error", f"No se pudieron cargar las autorizaciones: {e}")
+        print(f"Error al cargar solicitudes de pago: {e}")
+        return []
+
 
 def generar_documentos():
     id_autorizacion = autorizaciones.combo_autorizacion.get().split(" - ")[0]
@@ -83,3 +85,24 @@ def generar_excel(id_autorizacion, fecha_solicitud, monto, proyecto_contrato, ar
             os.startfile(file_path)  # Abrir automáticamente el archivo
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo generar el archivo Excel: {e}")
+
+def generar_pdf(id_solicitud):
+    try:
+        ruta_excel = f"solicitudes_pago/solicitud_{id_solicitud}.xlsx"
+        ruta_pdf = f"solicitudes_pago/solicitud_{id_solicitud}.pdf"
+        
+        workbook = load_workbook(ruta_excel)
+        sheet = workbook.active
+        
+        c = canvas.Canvas(ruta_pdf, pagesize=letter)
+        c.drawString(100, 750, f"Solicitud de Pago - ID: {id_solicitud}")
+        c.drawString(100, 730, f"Fecha: {sheet['B3'].value}")
+        c.drawString(100, 710, f"Monto: {sheet['B4'].value}")
+        c.drawString(100, 690, f"Proyecto: {sheet['B5'].value}")
+        c.drawString(100, 670, f"Proveedor: {sheet['B6'].value}")
+        c.save()
+        
+        return ruta_pdf
+    except Exception as e:
+        print(f"Error al convertir solicitud a PDF: {e}")
+        return None

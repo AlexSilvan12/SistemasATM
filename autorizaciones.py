@@ -34,6 +34,18 @@ def agregar_autorizacion(tipo, solicitante, puesto, area, fecha_solicitud, fecha
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo registrar la autorización: {e}")
 
+def cargar_autorizaciones():
+    try:
+            conexion = conectar_bd()
+            cursor = conexion.cursor()
+            cursor.execute("SELECT id_autorizacion FROM AutorizacionesCompra")
+            autorizaciones = cursor.fetchall()
+            autorizaciones.combo_autorizacion['values'] = [f"{a[0]} - {a[1]}" for a in autorizaciones]
+            cursor.close()
+            conexion.close()
+    except Exception as e:
+            messagebox.showerror("Error", f"No se pudieron cargar las autorizaciones: {e}")
+
 def generar_excel(id_autorizacion, tipo, solicitante, puesto, area, fecha_solicitud, fecha_requerida, proyecto_contrato, monto, id_proveedor, cantidad, unidad, articulo, observaciones, instrucciones):
     try:
         workbook = load_workbook("Autorizaciones.xlsx")
