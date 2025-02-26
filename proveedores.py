@@ -1,50 +1,50 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
+import mysql.connector
 from database import conectar_bd
+import tkinter as tk
 
-# Ventana para la gestión de proveedores
-def agregar_proveedor(nombre, rfc, email, banco, clave_bancaria, cuenta_bancaria):
-      
-        if not (nombre and rfc and clave_bancaria and cuenta_bancaria and banco):
-            messagebox.showwarning("Campos vacíos", "Por favor, llena todos los campos obligatorios.")
-            return
-
-        try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
-
-            query = """
-            INSERT INTO Proveedores (nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            """
-            valores = (nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco)
-            cursor.execute(query, valores)
-            conexion.commit()
-
-            messagebox.showinfo("Éxito", "Proveedor registrado correctamente.")
-          
-            cargar_proveedores()
-
-            cursor.close()
-            conexion.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el proveedor: {e}")
 
 def cargar_proveedores():
+    conexion = None
+    cursor = None
+
     try:
+        #Conectar a la base de datos
         conexion = conectar_bd()
-        query = "SELECT * FROM proveedores"
+        if conexion is None:
+            print ("❌No se pudo establecer la conexion")
+            return
         cursor = conexion.cursor()
+
+        #Se ejecuta la consulta
+        query = "SELECT * FROM proveedores"
         cursor.execute(query)
         proveedores = cursor.fetchall()
 
+        #Muestra resultados (esto es opcional)
+        print("✅Lista de Proveedores: ")
         for row in proveedores:
-             print (row)
-             
-        cursor.close()
-        conexion.close()
-        return proveedores
-    except Exception as e:
-        print(f"Error al cargar proveedores: {e}")
-        return []
+             print (row) 
 
+    except mysql.connector.Error as e:
+        print(f"❌Error al cargar proveedores: {e}")
+
+    finally:
+        #Cierra el cursor y la conexion si fueron creados correctamente
+        if cursor is not None:
+            cursor.close()
+        if conexion is not None:
+            conexion.close()
+
+def agregar_proveedor():
+    pass
+
+
+
+def gestionar_proveedores():
+    ventana = tk.Toplevel()
+    ventana.title("Gestión de Proveedores")
+    ventana.geometry("700x500")
+    tree = ttk.Treeview(ventana, columns=("ID", "Nombre", "RFC", "Email", "Banco"), show="headings")
+    tree.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+    tk.Button(ventana, text="Agregar Proveedor", command=agregar_proveedor).pack()

@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from proveedores import cargar_proveedores
 from autorizaciones import agregar_autorizacion
+from test_conection import cargar_proveedores
+
 
 def ventana_gestion_autorizaciones():
 

@@ -1,6 +1,6 @@
+import tkinter as tk
 from tkinter import messagebox
 from database import conectar_bd
-import autorizaciones
 from openpyxl import load_workbook
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -9,23 +9,42 @@ import os
 # Plantilla de solicitud de pago
 TEMPLATE_PATH = "Solicitud_Pago.xlsx"
 
-# Ventana para la gestión de solicitudes de pago
+#Funcion para conectar con las solicitudes almacenadas en la base de datos.
 def cargar_solicitudes():
+    conexion = None
+    cursor = None
+
     try:
+        #Conexion a la base datos
         conexion = conectar_bd()
+        if conexion is None:
+            print ("❌No se pudo establecer la conexion")
+            return
         cursor = conexion.cursor()
-        cursor.execute("SELECT id_solicitud, fecha_solicitud, monto, proyecto_contrato FROM SolicitudesPago")
+
+        #Ejecuta la consulta
+        cursor.execute("SELECT * FROM SolicitudesPago")
         solicitudes = cursor.fetchall()
-        cursor.close()
-        conexion.close()
-        return solicitudes
+
+        #Muestra resultados(opcional)
+        print("✅Lista de Solicitudes de Pago: ")
+        for row in solicitudes:
+             print (row)
+
     except Exception as e:
-        print(f"Error al cargar solicitudes de pago: {e}")
-        return []
+        print(f"❌Error al cargar solicitudes de pago: {e}")
+    
+    finally:
+        #Cierra el cursos y la conexion si fueron creados correctamente
+        if cursor is not None:
+            cursor.close()
+        if conexion is not None:
+            conexion.close()
 
 
-def generar_documentos():
-    id_autorizacion = autorizaciones.combo_autorizacion.get().split(" - ")[0]
+def generar_documentos(id_autorizacion):
+    
+    id_autorizacion = combo_autorizacion.get().split(" - ")[0]
 
     if not id_autorizacion:
         messagebox.showwarning("Selección requerida", "Por favor, selecciona una autorización de compra.")
@@ -106,3 +125,29 @@ def generar_pdf(id_solicitud):
     except Exception as e:
         print(f"Error al convertir solicitud a PDF: {e}")
         return None
+    
+
+#GUI
+def gestionar_solicitudes():
+    ventana = tk.Toplevel()
+    ventana.title("Gestión de Solicitudes de Pago")
+    ventana.geometry("600x400")
+
+    tk.Label(ventana, text="Ingrese ID de Autorización:").grid(row=0, column=0, padx=10, pady=5)
+    entry_id = tk.Entry(ventana)
+    entry_id.grid(row=0, column=1, padx=10, pady=5)
+
+    def generar_documentos():
+        id_autorizacion = entry_id.get()
+        if not id_autorizacion:
+            messagebox.showwarning("Advertencia", "Debe ingresar un ID de autorización.")
+            return
+        
+        ruta_excel = f"solicitudes_pago/solicitud_{id_autorizacion}.xlsx"
+        ruta_pdf = f"solicitudes_pago/solicitud_{id_autorizacion}.pdf"
+
+        generar_excel(id_autorizacion)
+        
+
+    btn_generar = tk.Button(ventana, text="Generar Solicitud", command=generar_documentos)
+    btn_generar.grid(row=1, column=0, columnspan=2, pady=10)
