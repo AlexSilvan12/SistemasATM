@@ -27,9 +27,8 @@ def cargar_solicitudes():
         solicitudes = cursor.fetchall()
 
         #Muestra resultados(opcional)
-        print("✅Lista de Solicitudes de Pago: ")
-        for row in solicitudes:
-             print (row)
+        print("✅Solicitudes de Pago cargadas")
+
 
     except Exception as e:
         print(f"❌Error al cargar solicitudes de pago: {e}")
@@ -131,23 +130,14 @@ def generar_pdf(id_solicitud):
 def gestionar_solicitudes():
     ventana = tk.Toplevel()
     ventana.title("Gestión de Solicitudes de Pago")
-    ventana.geometry("600x400")
-
-    tk.Label(ventana, text="Ingrese ID de Autorización:").grid(row=0, column=0, padx=10, pady=5)
-    entry_id = tk.Entry(ventana)
-    entry_id.grid(row=0, column=1, padx=10, pady=5)
-
-    def generar_documentos():
-        id_autorizacion = entry_id.get()
-        if not id_autorizacion:
-            messagebox.showwarning("Advertencia", "Debe ingresar un ID de autorización.")
-            return
-        
-        ruta_excel = f"solicitudes_pago/solicitud_{id_autorizacion}.xlsx"
-        ruta_pdf = f"solicitudes_pago/solicitud_{id_autorizacion}.pdf"
-
-        generar_excel(id_autorizacion)
-        
-
-    btn_generar = tk.Button(ventana, text="Generar Solicitud", command=generar_documentos)
-    btn_generar.grid(row=1, column=0, columnspan=2, pady=10)
+    ventana.geometry("700x500")
+    
+    tree = ttk.Treeview(ventana, columns=("ID", "Fecha", "Monto", "Proyecto"), show="headings")
+    tree.heading("ID", text="ID")
+    tree.heading("Fecha", text="Fecha")
+    tree.heading("Monto", text="Monto")
+    tree.heading("Proyecto", text="Proyecto")
+    tree.grid(row=0, column=0, columnspan=2, padx=10, pady=10)
+    
+    tk.Button(ventana, text="Generar PDF", command=lambda: generar_pdf(tree)).pack()
+    cargar_solicitudes(tree)

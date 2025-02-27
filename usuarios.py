@@ -1,26 +1,67 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from database import conectar_bd
+import mysql.connector
 import bcrypt
 
 
+def gestionar_usuarios():
+
+    ventana = tk.Toplevel()
+    ventana.title("Gestión de Usuarios")
+    ventana.geometry("400x300")
+
+    tk.Label(ventana, text="Nombre:").pack()
+    entry_nombre = tk.Entry(ventana)
+    entry_nombre.pack()
+
+    tk.Label(ventana, text="Email:").pack()
+    entry_email = tk.Entry(ventana)
+    entry_email.pack()
+
+    tk.Label(ventana, text="Contraseña:").pack()
+    entry_password = tk.Entry(ventana, show="*")
+    entry_password.pack()
+
+    tk.Label(ventana, text="Rol:").pack()
+    combo_rol = ttk.Combobox(ventana, values=["Administrador", "Contador", "Comprador"])
+    combo_rol.pack()
+
+    tk.Button(ventana, text="Agregar Usuario", command=agregar_usuario).pack(pady=10)
+
+
+#Funcion para agregar un usuario nuevo
 def agregar_usuario(nombre, email, password, rol):
 
     if not (nombre and email and password and rol):
         messagebox.showwarning("Campos vacíos", "Por favor, llena todos los campos.")
         return
+    
+    conexion = None
+    cursor = None
 
     try:
+        #Conexion a la base de datos
         conexion = conectar_bd()
+        if conexion is None:
+            print ("❌No se pudo establecer la conexion")
+            return
         cursor = conexion.cursor()
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
+        #Ejecuta la consulta
         query = "INSERT INTO Usuarios (nombre, email, password, rol) VALUES (%s, %s, %s, %s)"
-        cursor.execute(query, (nombre, email, hashed_password, rol))
+        cursor.execute(query, (nombre, email, password, rol))
         conexion.commit()
 
-        messagebox.showinfo("Éxito", "Usuario registrado correctamente.")
-        cursor.close()
-        conexion.close()
-    except Exception as e:
-            messagebox.showerror("Error", f"No se pudo registrar el usuario: {e}")
+        #Caja con el mensaje de que fue generado correctamente
+        messagebox.showinfo("✅Éxito", "Usuario registrado correctamente.")
+   
+    except mysql.connector.Error as e:
+        messagebox.showinfo(f"❌Error", "Usuario no agregado", {e})
+
+    finally:
+        #Cierra el cursor y la conexion si fueron creados correctamente
+        if cursor is not None:
+            cursor.close()
+        if conexion is not None:
+            conexion.close()
