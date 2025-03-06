@@ -62,6 +62,7 @@ def ventana_login():
 
     root = tk.Tk()
     root.title("Inicio de Sesión")
+    root.geometry("500x300")
     
     tk.Label(root, text="Usuario:").pack()
     entry_usuario = tk.Entry(root)
@@ -71,7 +72,7 @@ def ventana_login():
     entry_password = tk.Entry(root, show="*")
     entry_password.pack()
 
-    tk.Button(root, text="Ingresar", command=lambda: validar_usuario(entry_usuario, entry_password, root)).pack()
+    tk.Button(root, text="Ingresar", command=lambda: validar_usuario(entry_usuario, entry_password, root)).pack(pady=10)
     
     root.mainloop()
 

@@ -7,16 +7,19 @@ from usuarios import gestionar_usuarios
 
 def abrir_menu(rol):
     root = tk.Tk()
-    root.title("Menú Principal")
     root.geometry("400x300")
         
     if rol == "Administrador":
-        tk.Button(root, text="Gestión de Usuarios", command=gestionar_usuarios).pack()
-        tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack()
+        root.title("Menú Administrador")
+        tk.Button(root, text="Gestión de Usuarios", command=gestionar_usuarios).pack(pady=10)
+        tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack(pady=10)
     elif rol == "Contador":
-        tk.Button(root, text="Gestión de Solicitudes", command=gestionar_solicitudes).pack()
-        tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack()
+        root.title("Menú Contador")
+        tk.Button(root, text="Gestión de Solicitudes", command=gestionar_solicitudes).pack(pady=10)
+        tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack(pady=10)
     elif rol == "Comprador":
-        tk.Button(root, text="Gestión de Autorizaciones", command=gestionar_autorizaciones).pack()
+        root.title("Menú Compras")
+        tk.Button(root, text="Gestión de Autorizaciones", command=gestionar_autorizaciones).pack(pady=10)
+        tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack(pady=10)
     
     root.mainloop()
