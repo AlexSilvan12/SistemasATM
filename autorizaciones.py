@@ -68,10 +68,6 @@ def agregar_autorizacion(entry_consecutivo, combo_tipo, entry_solicitante, entry
         limpiar_formulario()
         cargar_autorizaciones()
 
-        if id_autorizacion:
-            generar_excel(id_autorizacion, tipo, solicitante, puesto, area, fecha_solicitud, fecha_requerida, proyecto_contrato, monto, id_proveedor, instruccion)
-        else:
-            messagebox.showerror("❌Error", "No se pudo generar el archivo Excel.")
 
     except mysql.connector.Error as e:
         conexion.rollback()
@@ -108,6 +104,7 @@ def agregar_articulo(entry_cantidad, entry_unidad, entry_articulo, entry_observa
     entry_observaciones.delete(0, tk.END)
         
 
+#Carga las autorizaciones y las muestra en la tabla
 def cargar_autorizaciones(tree):
 
     for row in tree.get_children():
@@ -144,6 +141,43 @@ def cargar_autorizaciones(tree):
         if conexion is not None:
             conexion.close()
 
+
+#Carga los articulos y los muestra en la tabla principal
+def cargar_articulos(tree):
+
+    for row in tree.get_children():
+        tree.delete(row)  
+
+        
+    conexion = None
+    cursor = None
+
+    try:
+        #Conectar a la base de datos
+        conexion = conectar_bd()
+        if conexion is None:
+            print ("❌No se pudo establecer la conexion")
+            return
+        cursor = conexion.cursor()
+
+        #Se ejecuta la consulta
+        query = "SELECT cantidad, unidad, articulo , observaciones FROM articulosautorizacion"
+        cursor.execute(query)
+        articulos = cursor.fetchall()
+
+        #Muestra resultados
+        for articulos in articulos:
+            tree.insert("", "end", values=articulos)
+
+    except mysql.connector.Error as e:
+        print(f"❌Error al cargar articulos: {e}")
+
+    finally:
+        #Cierra el cursor y la conexion si fueron creados correctamente
+        if cursor is not None:
+            cursor.close()
+        if conexion is not None:
+            conexion.close()
 
 def limpiar_formulario(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
                        entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor,
@@ -194,84 +228,163 @@ def generar_excel(id_autorizacion, tipo, solicitante, puesto, area, fecha_solici
         messagebox.showerror("Error", f"No se pudo generar el archivo Excel: {e}")
 
 
+def generar_excel_desde_seleccion(tree):
+    selected_item = tree.selection()
+    
+    if not selected_item:
+        messagebox.showwarning("Atención", "Seleccione una autorización para generar el Excel.")
+        return
+
+    solicitud = tree.item(selected_item, "values")
+    if not solicitud:
+        messagebox.showerror("Error", "No se pudo obtener la información de la solicitud.")
+        return
+
+    id_autorizacion = str(solicitud[0])  # Forzar que sea STRING
+    print(f"📌 ID Autorización antes de consulta: {id_autorizacion} ({type(id_autorizacion)})")
+
+    try:
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+
+        cursor.execute("""
+            SELECT fecha_solicitud, monto + 0, proyecto_contrato, instruccion, id_proveedor 
+            FROM AutorizacionesCompra 
+            WHERE CAST(id_autorizacion AS CHAR) = %s
+        """, (id_autorizacion,))
+        
+        autorizacion = cursor.fetchone()
+        if not autorizacion:
+            messagebox.showerror("Error", "No se encontró la autorización de compra.")
+            return
+
+        fecha_solicitud, monto, proyecto_contrato, instruccion, id_proveedor = autorizacion
+
+        try:
+            monto = float(monto)  # Convertir a número decimal
+        except ValueError:
+            messagebox.showerror("Error", "El monto no es un número válido.")
+            return
+
+        cursor.execute("""
+            SELECT nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco 
+            FROM Proveedores 
+            WHERE id_proveedor = %s
+        """, (id_proveedor,))
+        
+        proveedor = cursor.fetchone()
+        if not proveedor:
+            messagebox.showerror("Error", "No se encontró información del proveedor.")
+            return
+
+        cursor.execute("""
+            SELECT cantidad, unidad, articulo, observaciones
+            FROM ArticulosAutorizacion 
+            WHERE id_autorizacion = %s
+        """, (id_autorizacion,))
+        
+        articulos = cursor.fetchall()
+
+        cursor.close()
+        conexion.close()
+
+        generar_excel(id_autorizacion, fecha_solicitud, monto, proyecto_contrato, 
+                      instruccion, *proveedor, articulos)
+
+    except mysql.connector.Error as e:
+        messagebox.showerror("Error", f"No se pudo obtener los datos: {e}")
+
+
 def gestionar_autorizaciones():
 
     ventana = tk.Tk()
     ventana.title("Gestión de Autorizaciones de Compra")
     ventana.geometry("900x900")
 
-    tk.Label(ventana, text="Tipo de Solicitud: ").grid(row=1, column=0, padx=10, pady=5)
+    # Función para calcular posiciones relativas
+    def pos(x, y):
+        return {"relx": x, "rely": y, "anchor": "w"}  # Posiciona desde la izquierda
+    
+    tk.Label(ventana, text="Consecutivo: ").place(**pos(0.05, 0.05))
+    entry_consecutivo = tk.Entry(ventana)
+    entry_consecutivo.place(**pos(0.3, 0.05))
+
+
+    tk.Label(ventana, text="Tipo de Solicitud: ").place(**pos(0.05, 0.10))
     combo_tipo = ttk.Combobox(ventana, values=["Maquinaria", "Equipo y/o Htas", "Servicios", "EPP"])
-    combo_tipo.grid(row=1, column=1, padx= 10, pady= 5)
+    combo_tipo.place(**pos(0.3, 0.10))
 
-    tk.Label(ventana, text="Solicitante:").grid(row=2, column=0, padx=10, pady=5)
-    entry_solicitante= tk.Entry(ventana)
-    entry_solicitante.grid(row=2, column=1, padx=10, pady=5)
+    tk.Label(ventana, text="Solicitante:").place(**pos(0.05, 0.15))
+    entry_solicitante = tk.Entry(ventana)
+    entry_solicitante.place(**pos(0.3, 0.15))
 
-    tk.Label(ventana, text="Puesto:").grid(row=3, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Puesto:").place(**pos(0.05, 0.20))
     entry_puesto = tk.Entry(ventana)
-    entry_puesto.grid(row=3, column=1, padx=10, pady=5)
+    entry_puesto.place(**pos(0.3, 0.20))
 
-    tk.Label(ventana, text="Area:").grid(row=4, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Área:").place(**pos(0.05, 0.25))
     entry_area = tk.Entry(ventana)
-    entry_area.grid(row=4, column=1, padx=10, pady=5)
+    entry_area.place(**pos(0.3, 0.25))
 
-    tk.Label(ventana, text="Fecha de Solicitud:").grid(row=5, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Fecha de Solicitud (AAAA/MM/DD):").place(**pos(0.05, 0.30))
     entry_fecha_solicitud = tk.Entry(ventana)
-    entry_fecha_solicitud.grid(row=5, column=1, padx=10, pady=5)
+    entry_fecha_solicitud.place(**pos(0.3, 0.30))
 
-    tk.Label(ventana, text="Fecha Requerida:").grid(row=6, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Fecha Requerida (AAAA/MM/DD):").place(**pos(0.05, 0.35))
     entry_fecha_requerida = tk.Entry(ventana)
-    entry_fecha_requerida.grid(row=6, column=1, padx=10, pady=5)
+    entry_fecha_requerida.place(**pos(0.3, 0.35))
 
-    tk.Label(ventana, text="Proyecto y/o contrato:").grid(row=7, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Proyecto y/o contrato:").place(**pos(0.05, 0.40))
     entry_proyecto = tk.Entry(ventana)
-    entry_proyecto.grid(row=7, column=1, padx=10, pady=5)
+    entry_proyecto.place(**pos(0.3, 0.40))
 
-    tk.Label(ventana, text="Monto (solo valor numérico):").grid(row=8, column=0, padx=10, pady=5)
-    entry_monto = tk.Entry(ventana)    
-    entry_monto.grid(row=8, column=1, padx=10, pady=5)
+    tk.Label(ventana, text="Monto (solo valor numérico):").place(**pos(0.05, 0.45))
+    entry_monto = tk.Entry(ventana)
+    entry_monto.place(**pos(0.3, 0.45))
 
-    tk.Label(ventana, text="Proveedor:").grid(row=9, column=0, padx=10, pady=5)  
+    tk.Label(ventana, text="Proveedor:").place(**pos(0.05, 0.50))
     proveedores = cargar_proveedores()
-    combo_proveedor = ttk.Combobox(ventana, values=proveedores)  # Se pasa la lista como argumento
-    combo_proveedor.grid(row=9, column=1, padx=20, pady=10)
+    combo_proveedor = ttk.Combobox(ventana, values=proveedores)
+    combo_proveedor.place(**pos(0.3, 0.50))
 
-    tk.Label(ventana, text="Cantidad:").grid(row=10, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Cantidad:").place(**pos(0.55, 0.05))
     entry_cantidad = tk.Entry(ventana)
-    entry_cantidad.grid(row=10, column=1, padx=10, pady=5)
+    entry_cantidad.place(**pos(0.75, 0.05))
 
-    tk.Label(ventana, text="Unidad:").grid(row=11, column=0, padx=10, pady=5)
+    tk.Label(ventana, text="Unidad:").place(**pos(0.55, 0.10))
     entry_unidad = ttk.Combobox(ventana, values=["Piezas", "Litros", "Kilos", "Metros", "Otros"])
-    entry_unidad.grid(row=11, column=1, padx=10, pady=5)
+    entry_unidad.place(**pos(0.75, 0.10))
 
-    tk.Label(ventana, text="Descripcion:").grid(row=12, column=0, padx=10, pady=5) 
+    tk.Label(ventana, text="Descripción:").place(**pos(0.55, 0.15))
     entry_articulo = tk.Entry(ventana)
-    entry_articulo.grid(row=12, column=1, padx=10, pady=5)
+    entry_articulo.place(**pos(0.75, 0.15))
 
-    tk.Label(ventana, text="Observaciones:").grid(row=13, column=0, padx=25, pady=25)
+    tk.Label(ventana, text="Observaciones:").place(**pos(0.55, 0.20))
     entry_observaciones = tk.Entry(ventana)
-    entry_observaciones.grid(row=13, column=1, padx=10, pady=5)
+    entry_observaciones.place(**pos(0.75, 0.20))
 
-    tk.Label(ventana, text="Instruccion: ").grid(row=14, column=0, padx=10, pady=5)
-    combo_instruccion = ttk.Combobox(ventana, values=["Transferencia Electronica", "Tarjeta de Debito", "Efectivo"])
-    combo_instruccion.grid(row=14, column=1, padx=10, pady=5)
+    tk.Label(ventana, text="Instrucción: ").place(**pos(0.55, 0.25))
+    combo_instruccion = ttk.Combobox(ventana, values=["Transferencia Electrónica", "Tarjeta de Débito", "Efectivo"])
+    combo_instruccion.place(**pos(0.75, 0.25))
 
-    #Tabla de articulos
-    tk.Label(ventana, text="Artículos:").grid(row=15, column=0, padx=10, pady=5)
-    tree = ttk.Treeview(ventana, columns=("Cantidad", "Unidad", "Descripcion", "Observaciones"), show="headings")
+    # Tabla de artículos
+    tk.Label(ventana, text="Artículos:").place(**pos(0.05, 0.55))
+    tree = ttk.Treeview(ventana, columns=("Cantidad", "Unidad", "Descripción", "Observaciones"), show="headings")
     tree.heading("Cantidad", text="Cantidad")
     tree.heading("Unidad", text="Unidad")
-    tree.heading("Descripcion", text="Descripcion")
+    tree.heading("Descripción", text="Descripción")
     tree.heading("Observaciones", text="Observaciones")
-    tree.grid(row=15, column=0, columnspan=2, padx=10, pady=5)
+    tree.place(relx=0.05, rely=0.60, relwidth=0.9, relheight=0.2)  # Tamaño relativo
 
-    tk.Button(ventana, text="Registrar Autorización", command=lambda: agregar_autorizacion(
-    combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
-    entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion)).grid(row=16, column=0, columnspan=2, pady=10)
+    tk.Button(ventana, text="Registrar Autorización", command=lambda: agregar_autorizacion(entry_consecutivo,
+        combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
+        entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion)).place(relx=0.05, rely=0.85)
 
-    tk.Button(ventana, text="Agregar Artículo", command=lambda: agregar_articulo(entry_cantidad, entry_unidad, entry_articulo, entry_observaciones, tree)).grid(row=16, column=1, columnspan=2, pady=10)
-    cargar_autorizaciones(tree)
+    tk.Button(ventana, text="Agregar Artículo", command=lambda: agregar_articulo(entry_cantidad, entry_unidad, entry_articulo, entry_observaciones, tree)).place(relx=0.25, rely=0.85)
+
+    tk.Button(ventana, text="Generar Excel", command=lambda: generar_excel_desde_seleccion(tree)).grid(row=2, column=1, padx=10, pady=10)
+    
+    cargar_articulos(tree)
 
     ventana.mainloop()
 

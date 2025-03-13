@@ -13,6 +13,8 @@ def abrir_menu(rol):
         root.title("Menú Administrador")
         tk.Button(root, text="Gestión de Usuarios", command=gestionar_usuarios).pack(pady=10)
         tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack(pady=10)
+        tk.Button(root, text="Gestión de Autorizaciones", command=gestionar_autorizaciones).pack(pady=10)
+        tk.Button(root, text="Gestión de Solicitudes", command=gestionar_solicitudes).pack(pady=10)
     elif rol == "Contador":
         root.title("Menú Contador")
         tk.Button(root, text="Gestión de Solicitudes", command=gestionar_solicitudes).pack(pady=10)
@@ -20,6 +22,7 @@ def abrir_menu(rol):
     elif rol == "Comprador":
         root.title("Menú Compras")
         tk.Button(root, text="Gestión de Autorizaciones", command=gestionar_autorizaciones).pack(pady=10)
+        tk.Button(root, text="Gestión de Solicitudes", command=gestionar_solicitudes).pack(pady=10)
         tk.Button(root, text="Gestión de Proveedores", command=gestionar_proveedores).pack(pady=10)
     
     root.mainloop()
