@@ -1,12 +1,5 @@
-import tkinter as tk 
-from tkinter import messagebox
-from tkinter import ttk
 from database import conectar_bd
-from openpyxl import load_workbook
 import mysql.connector
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-import os
 
 class CargaSolicitud():
 
