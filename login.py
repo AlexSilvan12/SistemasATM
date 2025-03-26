@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import messagebox
 import mysql.connector
 from database import conectar_bd
+from PIL import Image, ImageTk
+import os
 
 
 def verificar_credenciales(email, password):
@@ -59,20 +61,37 @@ def validar_usuario(entry_email, entry_password, root):
 
 #GUI
 def ventana_login():
+    ventana = tk.Tk()
+    ventana.title("ATM | Gestor de Pagos y Autorizaciones")
+    ventana.geometry("500x400")
+    ventana.configure(bg="white")
 
-    root = tk.Tk()
-    root.title("Inicio de Sesión")
-    root.geometry("500x300")
-    
-    tk.Label(root, text="Usuario:").pack()
-    entry_usuario = tk.Entry(root)
+    # Cargar el logotipo desde la carpeta "plantillas"
+    ruta_logo = os.path.join("plantillas", "LogoATM.png")
+    if os.path.exists(ruta_logo):
+        imagen = Image.open(ruta_logo)
+        imagen = imagen.resize((150, 150), Image.Resampling.LANCZOS)
+        logo = ImageTk.PhotoImage(imagen)
+
+        label_logo = tk.Label(ventana, image=logo, bg="white")
+        label_logo.image = logo  # Referencia para evitar recolección de basura
+        label_logo.pack(pady=10)
+
+    # Título grande debajo del logo
+    label_titulo = tk.Label(ventana, text="ATM | Gestor de Pagos y Autorizaciones", 
+                            font=("Arial", 14, "bold"), bg="white", fg="#1a237e")
+    label_titulo.pack(pady=10)
+
+    # Usuario
+    tk.Label(ventana, text="Usuario:", bg="white", font=("Arial", 11)).pack(pady=(10, 0))
+    entry_usuario = tk.Entry(ventana, width=30)
     entry_usuario.pack()
 
-    tk.Label(root, text="Contraseña:").pack()
-    entry_password = tk.Entry(root, show="*")
-    entry_password.pack()
+    # Contraseña
+    tk.Label(ventana, text="Contraseña:", bg="white", font=("Arial", 11)).pack(pady=(10, 0))
+    entry_contraseña = tk.Entry(ventana, show="*", width=30)
+    entry_contraseña.pack()
 
-    tk.Button(root, text="Ingresar", command=lambda: validar_usuario(entry_usuario, entry_password, root)).pack(pady=10)
-    
-    root.mainloop()
+    tk.Button(ventana, text="Ingresar", command=lambda: validar_usuario(entry_usuario, entry_contraseña, ventana), width=20, bg="#283593", fg="white").pack(pady=20)
 
+    ventana.mainloop()

@@ -44,7 +44,7 @@ def agregar_usuario(nombre, email, password, rol):
 #Ventana para agrergar de Usuarios
 def gestionar_usuarios():
 
-    ventana = tk.Toplevel()
+    ventana = tk.Tk()
     ventana.title("Gestión de Usuarios")
     ventana.geometry("400x300")
 
@@ -68,6 +68,3 @@ def gestionar_usuarios():
         entry_nombre.get(), entry_email.get(), entry_password.get(), combo_rol.get())).pack(pady=10)
     
     ventana.mainloop()
-
-if __name__ == "__main__":
-    gestionar_usuarios()

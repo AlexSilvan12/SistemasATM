@@ -132,7 +132,7 @@ def ventana_agregar_proveedor(tree):
  
 def gestionar_proveedores():
 
-    ventana = tk.Toplevel()
+    ventana = tk.Tk()
     ventana.title("Gestión de Proveedores")
     ventana.geometry("1100x500")
     
