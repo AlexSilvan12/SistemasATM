@@ -313,6 +313,13 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
 #Interfaz de Usuario
 def gestionar_autorizaciones():
 
+    def filtrar_proveedores(event):
+        texto = combo_proveedor.get().lower()  # Obtener el texto en minúsculas
+        combo_proveedor["values"] = [prov for prov in proveedores if texto in prov.lower()]  # Filtrar proveedores
+
+        # Mover el cursor al final del texto para evitar que se resetee la posición
+        combo_proveedor.icursor(tk.END)  
+
     ventana = tk.Tk()
     ventana.title("Gestión de Autorizaciones de Compra")
     ventana.geometry("1200x600")
@@ -362,7 +369,9 @@ def gestionar_autorizaciones():
     tk.Label(ventana, text="Proveedor:").place(**pos(0.05, 0.50))
     proveedores = cargar_proveedores()
     combo_proveedor = ttk.Combobox(ventana, values=proveedores)
-    combo_proveedor.place(**pos(0.3, 0.50))
+    combo_proveedor.place(relx=0.3, rely=0.50)
+    combo_proveedor.bind("<KeyRelease>", filtrar_proveedores)  # Llamar a la función al escribir
+
 
     tk.Label(ventana, text="Cantidad:").place(**pos(0.55, 0.05))
     entry_cantidad = tk.Entry(ventana)

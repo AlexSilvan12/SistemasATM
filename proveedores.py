@@ -67,8 +67,6 @@ def agregar_proveedor(entry_nombre, entry_rfc, entry_email, entry_clave, entry_c
 
         #Mensaje de exito al agregar y cargar el proveedor nuevo a la tabla
         messagebox.showinfo("✅Éxito", "Proveedor agregado correctamente.")
-        gestionar_proveedores.lift()
-        gestionar_proveedores.focus_force()
         cargar_proveedores(tree)
         ventana.destroy()
 

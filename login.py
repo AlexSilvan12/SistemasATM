@@ -93,6 +93,8 @@ def ventana_login():
     entry_contraseña.pack()
 
     tk.Button(ventana, text="Ingresar", command=lambda: validar_usuario(entry_usuario, entry_contraseña, ventana), width=20, bg="#283593", fg="white").pack(pady=20)
-    tk.Button(ventana, text="Salir", command=ventana.quit, bg="black", fg="white",
+    
+    tk.Button(ventana, text="Salir", command=ventana.destroy, bg="black", fg="white",
               font=("Arial", 10, "bold"), width=15).pack(pady=10)
+    
     ventana.mainloop()
