@@ -63,7 +63,7 @@ def validar_usuario(entry_email, entry_password, root):
 def ventana_login():
     ventana = tk.Tk()
     ventana.title("ATM | Gestor de Pagos y Autorizaciones")
-    ventana.geometry("500x400")
+    ventana.geometry("800x600")
     ventana.configure(bg="white")
 
     # Cargar el logotipo desde la carpeta "plantillas"
@@ -93,5 +93,6 @@ def ventana_login():
     entry_contraseña.pack()
 
     tk.Button(ventana, text="Ingresar", command=lambda: validar_usuario(entry_usuario, entry_contraseña, ventana), width=20, bg="#283593", fg="white").pack(pady=20)
-
+    tk.Button(ventana, text="Salir", command=ventana.quit, bg="black", fg="white",
+              font=("Arial", 10, "bold"), width=15).pack(pady=10)
     ventana.mainloop()

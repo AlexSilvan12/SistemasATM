@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import mysql.connector
 from proveedores import cargar_proveedores
+from usuarios import cargar_usuarios
 from database import conectar_bd
 from openpyxl import load_workbook
 from openpyxl.styles import Font
@@ -9,12 +10,11 @@ import os
 from openpyxl.styles import Alignment
 from openpyxl.utils import get_column_letter
 
-
 #Funcion para agregar las autorizaciones
-def agregar_autorizacion(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion, entry_flimite, tree):
+def agregar_autorizacion(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion, entry_flimite, tree):
     consecutivo = entry_consecutivo.get()
     tipo = combo_tipo.get()
-    solicitante = entry_solicitante.get()
+    solicitante = combo_solicitante.get()
     puesto = entry_puesto.get()
     area = entry_area.get()
     fecha_solicitud = entry_fecha_solicitud.get()
@@ -187,13 +187,13 @@ def cargar_articulos(tree):
         if conexion is not None:
             conexion.close()
 
-def limpiar_formulario(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
+def limpiar_formulario(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
                        entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor,
                         combo_instruccion, entry_flimite):
     
     entry_consecutivo.delete(0, tk.END)
     combo_tipo.set("")  
-    entry_solicitante.delete(0, tk.END)
+    combo_solicitante.set("")
     entry_puesto.delete(0, tk.END)
     entry_area.delete(0, tk.END)
     entry_fecha_solicitud.delete(0, tk.END)
@@ -213,7 +213,7 @@ def limpiar_tabla(tree):
 
 
 #Funcion para generar el excel
-def generar_excel(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto, entry_area, 
+def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, 
                   entry_fecha_solicitud, entry_fecha_requerida, entry_proyecto, entry_monto, 
                   combo_proveedor, combo_instruccion, articulos, tree, entry_flimite):
 
@@ -224,7 +224,7 @@ def generar_excel(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto
 
         consecutivo = entry_consecutivo.get()
         tipo_solicitud = combo_tipo.get()
-        solicitante = entry_solicitante.get()
+        solicitante = combo_solicitante.get()
         puesto = entry_puesto.get()
         area = entry_area.get()
         fecha_solicitud = entry_fecha_solicitud.get()
@@ -294,12 +294,12 @@ def generar_excel(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto
             celda_obj.font = Font(bold=True, color="FF0000")
 
         # 📁 Guardar y abrir archivo
-        output_path = f"C:/Sistema_SPagos/Autorizaciones/Autorizacion_{consecutivo}.xlsx"
+        output_path = "Autorizaciones\\Autorizacion_{consecutivo}.xlsx"
         workbook.save(output_path)
         os.startfile(output_path)
 
         # 🧹 Limpiar y recargar
-        limpiar_formulario(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto, entry_area, 
+        limpiar_formulario(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, 
                            entry_fecha_solicitud, entry_fecha_requerida, entry_proyecto, entry_monto, 
                            combo_proveedor, combo_instruccion, entry_flimite)
         cargar_autorizaciones(tree)
@@ -331,8 +331,9 @@ def gestionar_autorizaciones():
     combo_tipo.place(**pos(0.3, 0.10))
 
     tk.Label(ventana, text="Solicitante:").place(**pos(0.05, 0.15))
-    entry_solicitante = tk.Entry(ventana)
-    entry_solicitante.place(**pos(0.3, 0.15))
+    solicitante = cargar_usuarios()
+    combo_solicitante = ttk.Combobox(ventana, values=solicitante)
+    combo_solicitante.place(**pos(0.3, 0.15))
 
     tk.Label(ventana, text="Puesto:").place(**pos(0.05, 0.20))
     entry_puesto = tk.Entry(ventana)
@@ -354,7 +355,7 @@ def gestionar_autorizaciones():
     entry_proyecto = tk.Entry(ventana)
     entry_proyecto.place(**pos(0.3, 0.40))
 
-    tk.Label(ventana, text="Monto (solo valor numérico):").place(**pos(0.05, 0.45))
+    tk.Label(ventana, text="Monto Total (solo valor numérico):").place(**pos(0.05, 0.45))
     entry_monto = tk.Entry(ventana)
     entry_monto.place(**pos(0.3, 0.45))
 
@@ -399,7 +400,7 @@ def gestionar_autorizaciones():
     #Ventana para vizualizar las autorizaciones cargadas
     def autorizaciones(tree):
     
-        ventana = tk.Tk()
+        ventana = tk.Toplevel()
         ventana.title("Autorizaciones Guardadas")
         ventana.geometry("1300x600")
 
@@ -410,22 +411,17 @@ def gestionar_autorizaciones():
         cargar_autorizaciones(tree)
 
     
+    tk.Button(ventana, text="Agregar Artículo", command=lambda: agregar_articulo(entry_cantidad, entry_unidad, entry_articulo, entry_observaciones, tree)).place(relx=0.05, rely=0.85)
+
 
     tk.Button(ventana, text="Registrar Autorización", command=lambda: agregar_autorizacion(entry_consecutivo,
-        combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
-        entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion, entry_flimite, tree)).place(relx=0.05, rely=0.85)
-
-    tk.Button(ventana, text="Agregar Artículo", command=lambda: agregar_articulo(entry_cantidad, entry_unidad, entry_articulo, entry_observaciones, tree)).place(relx=0.25, rely=0.85)
+        combo_tipo, combo_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
+        entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion, entry_flimite, tree)).place(relx=0.25, rely=0.85)
 
     tk.Button(ventana, text="Generar Excel", command=lambda: generar_excel(entry_consecutivo,
-        combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
+        combo_tipo, combo_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
         entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor, combo_instruccion, articulos_lista, tree, entry_flimite)).place(relx=0.45, rely=0.85)
     
     tk.Button(ventana,text="Autorizaciones Guardadas", command=lambda: autorizaciones(tree)).place(relx=0.65, rely=0.85)
     
-    
-
     ventana.mainloop()
-
-if __name__ == "__main__":
-    gestionar_autorizaciones()

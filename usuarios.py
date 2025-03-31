@@ -4,6 +4,38 @@ from database import conectar_bd
 import mysql.connector
 import bcrypt
 
+
+#funcion para cargar usuarios registrados
+def cargar_usuarios():
+    conexion = None
+    cursor = None
+
+    try:
+        #Conectar a la base de datos
+        conexion = conectar_bd()
+        if conexion is None:
+            print ("❌No se pudo establecer la conexion")
+            return
+        cursor = conexion.cursor()
+
+        #Se ejecuta la consulta
+        query = "SELECT nombre FROM usuarios WHERE rol <> 'administrador'"
+        cursor.execute(query)
+        usuarios = [f"{row[0]}" for row in cursor.fetchall()]
+        
+        print("✅Usuarios cargados correctamente: ")
+        return usuarios
+    except mysql.connector.Error as e:
+        print(f"❌Error al cargar usuarios: {e}")
+
+    finally:
+        #Cierra el cursor y la conexion si fueron creados correctamente
+        if cursor is not None:
+            cursor.close()
+        if conexion is not None:
+            conexion.close()
+
+
 #Funcion para agregar un usuario nuevo
 def agregar_usuario(nombre, email, password, rol):
 
@@ -44,9 +76,9 @@ def agregar_usuario(nombre, email, password, rol):
 #Ventana para agrergar de Usuarios
 def gestionar_usuarios():
 
-    ventana = tk.Tk()
+    ventana = tk.Toplevel()
     ventana.title("Gestión de Usuarios")
-    ventana.geometry("400x300")
+    ventana.geometry("800x600")
 
     tk.Label(ventana, text="Nombre:").pack()
     entry_nombre = tk.Entry(ventana)
@@ -67,4 +99,7 @@ def gestionar_usuarios():
     tk.Button(ventana, text="Agregar Usuario", command=lambda: agregar_usuario(
         entry_nombre.get(), entry_email.get(), entry_password.get(), combo_rol.get())).pack(pady=10)
     
+    
     ventana.mainloop()
+
+ 

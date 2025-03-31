@@ -4,10 +4,10 @@ from tkinter import ttk
 from database import conectar_bd
 from openpyxl import load_workbook
 import mysql.connector
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 import os
 from openpyxl.styles import Alignment
+
+
 
 # Plantilla de solicitud de pago
 TEMPLATE_PATH = "Plantillas\Solicitud_Pago.xlsx"
@@ -66,13 +66,12 @@ def cargar_autorizaciones(tree):
         if conexion: conexion.close()
 
 # Función principal para generar el Excel desde la selección del Treeview
-def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia):
+def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura):
     id_solicitud = entry_consecutivo.get().strip()
     concepto = entry_concepto.get().strip()
     referencia_pago = entry_referencia.get().strip()
+    factura = entry_factura.get().strip()
     
-
-
     if not id_solicitud:
         messagebox.showwarning("Consecutivo vacío", "Debes ingresar un consecutivo para la solicitud.")
         return
@@ -137,17 +136,18 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
                     importe, instruccion, referencia_pago, concepto, 
                     fecha_recibido_revision, fecha_limite_pago, num_facturas, proyecto_contrato
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
                 cursor.execute(query, (
                 id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud,
-                monto, instruccion, referencia_pago, concepto, fecha_solicitud, fechalimite, proyecto_contrato
+                monto, instruccion, referencia_pago, concepto, fecha_solicitud, fechalimite, factura, proyecto_contrato
             ))
             conexion.commit()
             messagebox.showinfo("✅ Éxito", f"Solicitud '{id_solicitud}' guardada en la base de datos.")
             entry_consecutivo.delete(0, tk.END)
             entry_referencia.delete(0, tk.END)
             entry_concepto.delete(0, tk.END)
+            entry_factura.delete(0,tk.END)
 
                 # 🔄 Recargar el Treeview
             cargar_autorizaciones(tree)
@@ -160,12 +160,12 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 
     # Generar el archivo Excel
     generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
-                  referencia_pago, fechalimite, concepto, *proveedor)
+                  referencia_pago, fechalimite, concepto, factura, *proveedor)
 
 
 # Función que llena la plantilla Excel con los datos
 def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
-                  referencia_pago, fechalimite, concepto, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco):
+                  referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco):
     try:
         wb = load_workbook(TEMPLATE_PATH)
         sheet = wb.active
@@ -200,6 +200,7 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
         escribir(22, 3, cuenta_bancaria, combinar="C22:E22")     # C22 - Cuenta bancaria
         escribir(22, 7, banco, combinar="G22:H22")               # G22 - Banco
         escribir(29, 8, fechalimite, combinar="H29:L29")         # H29 - Limite de Pago
+        escribir(34, 3, factura, combinar="C34:F34")             # C34 - Numero de factura
         escribir(15, 3, instruccion, combinar="C15:E15")         # C15 - Instrucción
         escribir(22, 10, referencia_pago, combinar="J22:L22")    # J22 - Referencia de pago
         escribir(25, 3, concepto, combinar="C25:L25")            # C25 - Concepto
@@ -217,14 +218,51 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
 
 # Interfaz gráfica
 def gestionar_solicitudes():
-    ventana = tk.Tk()
+    ventana = tk.Toplevel()
     ventana.title("Solicitudes de Pago")
     ventana.geometry("1000x600")
 
     # Buscar
     tk.Label(ventana, text="Buscar:").place(relx=0.05, rely=0.02)
-    entry_filtro = tk.Entry(ventana, width=30)
-    entry_filtro.place(relx=0.12, rely=0.02)
+    entry_busqueda = tk.Entry(ventana, width=50)
+    entry_busqueda.place(relx=0.1, rely=0.02)
+
+    def buscar(*args):  # Acepta *args por el trace
+        termino = entry_busqueda.get().lower()
+        for item in tree.get_children():
+            tree.delete(item)
+
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        if termino:
+            consulta = """
+                SELECT id_autorizacion, fecha_solicitud, monto, proyecto_contrato FROM autorizacionescompra
+                WHERE LOWER(id_autorizacion) LIKE %s
+                OR LOWER(fecha_solicitud) LIKE %s
+                OR LOWER(monto) LIKE %s
+                OR LOWER(proyecto_contrato) LIKE %s       
+            """
+            like_termino = f"%{termino}%"
+            cursor.execute(consulta, (like_termino, like_termino, like_termino, like_termino))
+
+        else : 
+            consulta= ("""
+                SELECT id_autorizacion, fecha_solicitud, monto, proyecto_contrato
+                FROM autorizacionescompra
+                WHERE id_autorizacion NOT IN (
+                    SELECT id_autorizacion FROM SolicitudesPago
+                )""")
+            cursor.execute(consulta)
+            
+        resultados = cursor.fetchall()
+        conexion.close()
+
+        for row in resultados:
+            tree.insert("", tk.END, values=row)
+
+    entry_busqueda_var = tk.StringVar()
+    entry_busqueda.config(textvariable=entry_busqueda_var)
+    entry_busqueda_var.trace("w", buscar)  # Búsqueda automática al escribir
 
     # Consecutivo
     tk.Label(ventana, text="Consecutivo de Solicitud:").place(relx=0.05, rely=0.08)
@@ -241,6 +279,11 @@ def gestionar_solicitudes():
     entry_referencia = tk.Entry(ventana, width=40)
     entry_referencia.place(relx=0.17, rely=0.20)
 
+    #Numero de Factura
+    tk.Label(ventana, text="Numero de Factura:").place(relx=0.05, rely=0.26)
+    entry_factura = tk.Entry(ventana, width=30)
+    entry_factura.place(relx=0.17, rely=0.26)
+
     # Treeview (tabla)
     tree = ttk.Treeview(ventana, columns=("ID", "Fecha", "Monto", "Proyecto"), show="headings")
     for col in ("ID", "Fecha", "Monto", "Proyecto"):
@@ -250,14 +293,14 @@ def gestionar_solicitudes():
     scrollbar = ttk.Scrollbar(ventana, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
 
-    tree.place(relx=0.05, rely=0.28, relwidth=0.88, relheight=0.55)
-    scrollbar.place(relx=0.93, rely=0.28, relheight=0.55)
+    tree.place(relx=0.05, rely=0.32, relwidth=0.88, relheight=0.55)
+    scrollbar.place(relx=0.93, rely=0.32, relheight=0.55)
 
     # Ventana de solicitudes guardadas
     def Solicitudes():
         ventana_solicitudes = tk.Toplevel(ventana)
         ventana_solicitudes.title("Solicitudes Guardadas")
-        ventana_solicitudes.geometry("1000x600")
+        ventana_solicitudes.geometry("1100x600")
 
         tree_local = ttk.Treeview(ventana_solicitudes, columns=("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"), show="headings")
         for col in ("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"):
@@ -273,7 +316,7 @@ def gestionar_solicitudes():
 
     # Botones
     tk.Button(ventana, text="Generar Excel",
-              command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia)
+              command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura)
              ).place(relx=0.40, rely=0.88)
 
     tk.Button(ventana, text="Solicitudes Guardadas", command=Solicitudes).place(relx=0.58, rely=0.88)
@@ -284,3 +327,5 @@ def gestionar_solicitudes():
 # Ejecutar la app
 if __name__ == "__main__":
     gestionar_solicitudes()
+
+

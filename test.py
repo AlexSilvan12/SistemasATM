@@ -1,52 +1,70 @@
 import tkinter as tk
 from PIL import Image, ImageTk
 import os
-import login  # Para volver al login al cerrar sesión
+from proveedores import gestionar_proveedores
+from solicitudes import gestionar_solicitudes
+from autorizaciones import gestionar_autorizaciones
+from usuarios import gestionar_usuarios
+import login
 
-# Ruta del logotipo
 LOGO_PATH = os.path.join("plantillas", "LogoATM.png")
 
-# Función para cerrar sesión y volver al login
 def cerrar_sesion(ventana):
+    """ Cierra la ventana actual y regresa a la pantalla de login """
     ventana.destroy()
     login.ventana_login()
 
-# Ventana del menú principal
-def mostrar_menu_principal():
-    ventana = tk.Tk()
-    ventana.title("ATM | Gestor de Pagos y Autorizaciones")
-    ventana.geometry("800x600")
-    ventana.configure(bg="white")
+def abrir_menu(rol, ventana_anterior=None):
+    """ Abre el menú según el rol del usuario y cierra la ventana anterior si existe """
+    if ventana_anterior:
+        ventana_anterior.destroy()
+    
+    root = tk.Tk()
+    root.title(f"Menú {rol}")
+    root.geometry("800x600")
+    root.configure(bg="white")
+    root.minsize(800, 600)  # Tamaño mínimo para evitar que se deforme
 
     # Cargar logotipo
     try:
-        imagen = Image.open(LOGO_PATH)
-        imagen = imagen.resize((120, 120), Image.Resampling.LANCZOS)
+        imagen = Image.open(LOGO_PATH).resize((120, 120), Image.Resampling.LANCZOS)
         logo = ImageTk.PhotoImage(imagen)
-        logo_label = tk.Label(ventana, image=logo, bg="white")
-        logo_label.image = logo
-        logo_label.pack(pady=10)
+        tk.Label(root, image=logo, bg="white").pack(pady=10)
     except Exception as e:
         print(f"⚠️ No se pudo cargar el logotipo: {e}")
 
-    # Título de la app
-    tk.Label(ventana, text="ATM | Gestor de Pagos y Autorizaciones",
-             font=("Arial", 20, "bold"), bg="white", fg="#003366").pack(pady=10)
+    # Definir botones según el rol
+    opciones = {
+        "Administrador": [
+            ("Gestión de Usuarios", gestionar_usuarios),
+            ("Gestión de Proveedores", gestionar_proveedores),
+            ("Gestión de Autorizaciones", gestionar_autorizaciones),
+            ("Gestión de Solicitudes", gestionar_solicitudes),
+        ],
+        "Contador": [
+            ("Gestión de Solicitudes", gestionar_solicitudes),
+            ("Gestión de Autorizaciones", gestionar_autorizaciones),
+            ("Gestión de Proveedores", gestionar_proveedores),
+        ],
+        "Comprador": [
+            ("Gestión de Autorizaciones", gestionar_autorizaciones),
+            ("Gestión de Solicitudes", gestionar_solicitudes),
+            ("Gestión de Proveedores", gestionar_proveedores),
+        ]
+    }
 
-    # Área de botones principales
-    frame_botones = tk.Frame(ventana, bg="white")
-    frame_botones.pack(pady=20)
-
-    # Aquí puedes agregar botones funcionales del sistema
-    tk.Button(frame_botones, text="Gestión de Autorizaciones", width=30, height=2).grid(row=0, column=0, padx=10, pady=10)
-    tk.Button(frame_botones, text="Solicitudes de Pago", width=30, height=2).grid(row=0, column=1, padx=10, pady=10)
+    for texto, comando in opciones.get(rol, []):
+        tk.Button(root, text=texto, width=30, height=2, font=("Arial", 10, "bold"),
+                  command=comando).pack(pady=10)
 
     # Botón para cerrar sesión
-    tk.Button(ventana, text="Cerrar sesión", command=lambda: cerrar_sesion(ventana),
-              bg="#cc0000", fg="white", font=("Arial", 10, "bold"), width=15).pack(pady=20)
+    tk.Button(root, text="Cerrar sesión", command=lambda: cerrar_sesion(root),
+              bg="#cc0000", fg="white", font=("Arial", 10, "bold"), width=15).pack(pady=10)
 
-    ventana.mainloop()
+    # Botón para salir completamente
+    tk.Button(root, text="Salir", command=root.quit, bg="black", fg="white",
+              font=("Arial", 10, "bold"), width=15).pack(pady=10)
 
-# Para pruebas locales
-if __name__ == "__main__":
-    mostrar_menu_principal()
+    root.mainloop()
+
+ 
