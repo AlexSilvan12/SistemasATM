@@ -5,7 +5,7 @@ import mysql.connector
 import bcrypt
 
 
-#funcion para cargar usuarios registrados
+#funcion para cargar usuarios registrados que no son administradores
 def cargar_usuarios():
     conexion = None
     cursor = None
@@ -42,7 +42,7 @@ def cargar_usuarios_tree(tree):
 
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("SELECT id_usuario, nombre, email, password, rol, puesto FROM usuarios")
+    cursor.execute("SELECT id_usuario, nombre, email, rol, puesto FROM usuarios")
     usuarios = cursor.fetchall()
 
     for usuario in usuarios:
@@ -52,16 +52,16 @@ def cargar_usuarios_tree(tree):
     conexion.close()
 
 #Funcion para modificar los usuarios en la base de datos
-def modificar_usuario(id_usuario, nombre, email, password, rol, puesto):
-    # Encriptar la contraseña antes de almacenarla
-    password_encrypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()) if password else None
-    
+def modificar_usuario(id_usuario, nombre, email, rol, puesto, nueva_password, password_actual):
     conexion = None
     cursor = None
 
     try:
         conexion = conectar_bd()
         cursor = conexion.cursor()
+
+        # 🔹 Si el usuario dejó la contraseña en blanco, mantenemos la actual
+        password_encrypted = bcrypt.hashpw(nueva_password.encode('utf-8'), bcrypt.gensalt()) if nueva_password else password_actual
 
         query = """
         UPDATE usuarios
@@ -83,13 +83,14 @@ def modificar_usuario(id_usuario, nombre, email, password, rol, puesto):
         if conexion:
             conexion.close()
 
+
 #Funcion para agregar un usuario nuevo
 def agregar_usuario(nombre, email, password, rol, puesto, tree):
     if not (nombre and email and password and rol and puesto):
         messagebox.showwarning("Campos vacíos", "Por favor, llena todos los campos.")
         return
     
-    password_encrypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()) if password else None
+    password_encrypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8') if password else None
     
     conexion = None
     cursor = None
@@ -112,7 +113,7 @@ def agregar_usuario(nombre, email, password, rol, puesto, tree):
         cargar_usuarios_tree(tree)
    
     except mysql.connector.Error as e:
-        messagebox.showerror(f"❌Error", "Usuario no agregado", {e})
+        messagebox.showerror("❌Error", "Usuario no agregado: {e}")
 
     finally:
         if cursor:
@@ -168,35 +169,45 @@ def ventana_update(tree):
 
     item = tree.item(seleccion)
     valores = item["values"]
-    id_usuario = valores[0]  # El ID está en la primera posición, no lo necesitamos en los campos
+    id_usuario = valores[0]  # El ID está en la primera posición
+
+    # 🔹 Conectar a la BD para obtener la contraseña real
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT password FROM usuarios WHERE id_usuario = %s", (id_usuario,))
+    resultado = cursor.fetchone()
+    conexion.close()
+
+    password_actual = resultado[0] if resultado else ""  # Si no hay resultado, dejamos vacío
 
     ventana = tk.Toplevel()
     ventana.title("Modificar Usuario")
     ventana.geometry("400x400")
 
-    # Campos en orden según la tabla
-    campos = ["Nombre", "Email", "Password", "Rol", "Puesto"]
+    # Campos en orden (ahora incluimos la contraseña)
+    campos = ["Nombre", "Email", "Rol", "Puesto", "Nueva Contraseña"]
     entradas = []
 
-    # Asegurarse de que estamos comenzando en el valor correcto
     for i, campo in enumerate(campos):
         rel_y = 0.05 + i * 0.1
         tk.Label(ventana, text=campo).place(relx=0.05, rely=rel_y)
         entry = tk.Entry(ventana, width=30)
         
-        # Aquí aseguramos que estamos usando el valor correcto de `valores`
-        entry.insert(0, valores[i + 1])  # Empezamos desde valores[1], ya que valores[0] es el ID
+        if campo != "Nueva Contraseña":
+            entry.insert(0, valores[i + 1])  # Cargamos los datos existentes (excepto password)
+
         entry.place(relx=0.45, rely=rel_y)
         entradas.append(entry)
 
     def guardar():
         nuevos_datos = [e.get() for e in entradas]
-        # Pasamos id_usuario junto con los nuevos datos
-        modificar_usuario(id_usuario, *nuevos_datos)
+        nueva_password = nuevos_datos.pop()  # Extraemos la contraseña del final
+        modificar_usuario(id_usuario, *nuevos_datos, nueva_password, password_actual)
         ventana.destroy()
         cargar_usuarios_tree(tree)
 
     tk.Button(ventana, text="Guardar cambios", command=guardar).place(relx=0.35, rely=0.75)
+
 
 # Ventana para gestionar usuarios
 def gestionar_usuarios():
@@ -228,21 +239,19 @@ def gestionar_usuarios():
     # Árbol de usuarios (ajustado para ocupar menos espacio vertical)
     tree = ttk.Treeview(
         ventana,
-        columns=("ID", "Nombre", "Email", "Password","Rol", "Puesto"),
+        columns=("ID", "Nombre", "Email","Rol", "Puesto"),
         show="headings"
     )
 
     tree.heading("ID", text="ID")
     tree.heading("Nombre", text="Nombre")
     tree.heading("Email", text="Email")
-    tree.heading("Password", text="Password")
     tree.heading("Rol", text="Rol")
     tree.heading("Puesto", text="Puesto")
 
     tree.column("ID", width=50)
     tree.column("Nombre", width=250)
     tree.column("Email", width=250)
-    tree.column("Password", width=150)
     tree.column("Rol", width=150)
     tree.column("Puesto", width=120)
 

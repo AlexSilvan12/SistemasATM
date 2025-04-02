@@ -206,7 +206,7 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
         escribir(25, 3, concepto, combinar="C25:L25")            # C25 - Concepto
 
         # Guardar y abrir
-        nombre_archivo = f"C:/Sistema_SPagos/Solicitudes/solicitud_{id_solicitud}.xlsx"
+        nombre_archivo = f"Solicitudes\\solicitud_{id_solicitud}.xlsx"
         wb.save(nombre_archivo)
 
         messagebox.showinfo("✅ Éxito", f"Archivo generado: {nombre_archivo}")
@@ -323,9 +323,3 @@ def gestionar_solicitudes():
 
     cargar_autorizaciones(tree)
     ventana.mainloop()
-
-# Ejecutar la app
-if __name__ == "__main__":
-    gestionar_solicitudes()
-
-

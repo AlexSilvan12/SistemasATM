@@ -187,6 +187,7 @@ def cargar_articulos(tree):
         if conexion is not None:
             conexion.close()
 
+
 def limpiar_formulario(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
                        entry_fecha_requerida, entry_proyecto, entry_monto, combo_proveedor,
                         combo_instruccion, entry_flimite):
@@ -216,7 +217,7 @@ def limpiar_tabla(tree):
 def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, 
                   entry_fecha_solicitud, entry_fecha_requerida, entry_proyecto, entry_monto, 
                   combo_proveedor, combo_instruccion, articulos, tree, entry_flimite):
-
+    
     try:
         plantilla_path = "Plantillas\\Autorizaciones.xlsx"
         workbook = load_workbook(plantilla_path)
@@ -233,6 +234,7 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         monto = entry_monto.get()
         proveedor = combo_proveedor.get()
         instruccion = combo_instruccion.get()
+
 
         # ✅ Función para escribir y recombinar celdas
         def escribir_celda(fila, columna, valor, rango_combinado=None):

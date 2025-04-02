@@ -4,42 +4,46 @@ import mysql.connector
 from database import conectar_bd
 from PIL import Image, ImageTk
 import os
-
+import bcrypt
 
 def verificar_credenciales(email, password):
 
     if not email or not password:
-         messagebox.showwarning("Campos vacíos", "Por favor, ingresa tus credenciales.")
-         return
+        messagebox.showwarning("Campos vacíos", "Por favor, ingresa tus credenciales.")
+        return None
         
     conexion = None
     cursor = None
 
     try:
-        #conectar a la base de datos
+        # Conectar a la base de datos
         conexion = conectar_bd()
         if conexion is None:
-            print ("❌No se pudo establecer la conexion")
-            return
+            print("❌ No se pudo establecer la conexión")
+            return None
         cursor = conexion.cursor()
 
-        #Ejecutar consulta
-        query = "SELECT rol FROM Usuarios WHERE email = %s AND password = %s"
-        cursor.execute(query, (email, password))
+        # Obtener la contraseña cifrada de la base de datos
+        query = "SELECT password, rol FROM Usuarios WHERE email = %s"
+        cursor.execute(query, (email,))
         resultado = cursor.fetchone()
 
-        #Compara los datos ingresados con la base de datos
-        return resultado[0] if resultado else None
+        if resultado:
+            contraseña_guardada, rol = resultado
+            # Verificar si la contraseña ingresada coincide con la cifrada
+            if bcrypt.checkpw(password.encode('utf-8'), contraseña_guardada.encode('utf-8')):
+                return rol  # Retorna el rol si la contraseña es correcta
+
+        return None  # Si la contraseña no coincide o el usuario no existe
     
     except mysql.connector.Error as e:
-             messagebox.showerror("❌Error de conexión", f"No se pudo conectar a la base de datos: {e}")
+        messagebox.showerror("❌ Error de conexión", f"No se pudo conectar a la base de datos: {e}")
 
     finally:
-    #Cierra el cursor y la conexion si fueron creados correctamente
-     if cursor is not None:
-        cursor.close()
-     if conexion is not None:
-        conexion.close()  
+        if cursor is not None:
+            cursor.close()
+        if conexion is not None:
+            conexion.close()  
 
 #Funcion para manejar la logica de la GUI
 def validar_usuario(entry_email, entry_password, root):
