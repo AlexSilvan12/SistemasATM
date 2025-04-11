@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 import mysql.connector
 from proveedores import cargar_proveedores
 from usuarios import cargar_usuarios
+from utils import ruta_relativa, centrar_ventana
 from database import conectar_bd
 from openpyxl import load_workbook
 from openpyxl.styles import Font
@@ -219,7 +220,7 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
                   combo_proveedor, combo_instruccion, articulos, tree, entry_flimite):
     
     try:
-        plantilla_path = "Plantillas\\Autorizaciones.xlsx"
+        plantilla_path = ruta_relativa("Plantillas/Autorizaciones.xlsx")
         workbook = load_workbook(plantilla_path)
         sheet = workbook.active
 
@@ -283,7 +284,7 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
             "Maquinaria": "B10",
             "Equipo y/o Htas": "D10",
             "Servicios": "F10",
-            "Otros": "H9"
+            "Otros": "H10"
         }
 
         # Limpiar anteriores
@@ -296,7 +297,8 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
             celda_obj.font = Font(bold=True, color="FF0000")
 
         # 📁 Guardar y abrir archivo
-        output_path = "Autorizaciones\\Autorizacion_{consecutivo}.xlsx"
+        CARPETA_AUTORIZACIONES = ruta_relativa("Autorizaciones")
+        output_path = os.path.join(CARPETA_AUTORIZACIONES, f"Autorizacion_{consecutivo}.xlsx")
         workbook.save(output_path)
         os.startfile(output_path)
 
@@ -313,6 +315,27 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
 
 
 #Interfaz de Usuario
+def hex_a_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2 ,4))
+
+def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
+    canvas.delete("degradado")
+
+    rgb_inicio = hex_a_rgb(color_inicio)
+    rgb_fin = hex_a_rgb(color_fin)
+
+    pasos = alto // 2
+    for i in range(pasos):
+        y = alto - i - 1
+        r = int(rgb_inicio[0] + (rgb_fin[0] - rgb_inicio[0]) * i / pasos)
+        g = int(rgb_inicio[1] + (rgb_fin[1] - rgb_inicio[1]) * i / pasos)
+        b = int(rgb_inicio[2] + (rgb_fin[2] - rgb_inicio[2]) * i / pasos)
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        canvas.create_line(0, y, ancho, y, fill=color, tags="degradado")
+
+    canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
+
 def gestionar_autorizaciones():
 
     def filtrar_proveedores(event):
@@ -322,9 +345,9 @@ def gestionar_autorizaciones():
         # Mover el cursor al final del texto para evitar que se resetee la posición
         combo_proveedor.icursor(tk.END)  
 
-    ventana = tk.Tk()
+    ventana = tk.Toplevel()
     ventana.title("Gestión de Autorizaciones de Compra")
-    ventana.geometry("1200x600")
+    centrar_ventana(ventana, 1200, 600)
 
     # Función para calcular posiciones relativas
     def pos(x, y):
@@ -371,16 +394,15 @@ def gestionar_autorizaciones():
     tk.Label(ventana, text="Proveedor:").place(**pos(0.05, 0.50))
     proveedores = cargar_proveedores()
     combo_proveedor = ttk.Combobox(ventana, values=proveedores)
-    combo_proveedor.place(relx=0.3, rely=0.50)
+    combo_proveedor.place(relx=0.3, rely=0.50, relwidth=0.20)
     combo_proveedor.bind("<KeyRelease>", filtrar_proveedores)  # Llamar a la función al escribir
-
 
     tk.Label(ventana, text="Cantidad:").place(**pos(0.55, 0.05))
     entry_cantidad = tk.Entry(ventana)
     entry_cantidad.place(**pos(0.75, 0.05))
 
     tk.Label(ventana, text="Unidad:").place(**pos(0.55, 0.10))
-    entry_unidad = ttk.Entry(ventana)
+    entry_unidad = tk.Entry(ventana)
     entry_unidad.place(**pos(0.75, 0.10))
 
     tk.Label(ventana, text="Descripción:").place(**pos(0.55, 0.15))

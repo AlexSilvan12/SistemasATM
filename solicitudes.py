@@ -2,15 +2,11 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 from database import conectar_bd
+from utils import ruta_relativa, centrar_ventana
 from openpyxl import load_workbook
 import mysql.connector
 import os
 from openpyxl.styles import Alignment
-
-
-
-# Plantilla de solicitud de pago
-TEMPLATE_PATH = "Plantillas\Solicitud_Pago.xlsx"
 
 # Función para conectar con las solicitudes almacenadas en la base de datos
 def cargar_solicitudes(tree):
@@ -166,8 +162,11 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 # Función que llena la plantilla Excel con los datos
 def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
                   referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco):
+    
     try:
-        wb = load_workbook(TEMPLATE_PATH)
+        # Plantilla de solicitud de pago
+        plantilla_path = ruta_relativa("Plantillas/Solicitud_Pago.xlsx")
+        wb = load_workbook(plantilla_path)
         sheet = wb.active
 
         # Función para escribir en celdas combinadas
@@ -206,11 +205,12 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
         escribir(25, 3, concepto, combinar="C25:L25")            # C25 - Concepto
 
         # Guardar y abrir
-        nombre_archivo = f"Solicitudes\\solicitud_{id_solicitud}.xlsx"
-        wb.save(nombre_archivo)
+        CARPETA_SOLICITUDES = ruta_relativa("Solicitudes")
+        output_path = os.path.join(CARPETA_SOLICITUDES, f"Solicitud de Pago_{id_solicitud}.xlsx")
+        wb.save(output_path)
 
-        messagebox.showinfo("✅ Éxito", f"Archivo generado: {nombre_archivo}")
-        os.startfile(nombre_archivo)
+        messagebox.showinfo("✅ Éxito", f"Archivo generado: {output_path}")
+        os.startfile(output_path)
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo generar el Excel:\n{e}")
@@ -220,7 +220,7 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
 def gestionar_solicitudes():
     ventana = tk.Toplevel()
     ventana.title("Solicitudes de Pago")
-    ventana.geometry("1000x600")
+    centrar_ventana(ventana, 1000, 600)
 
     # Buscar
     tk.Label(ventana, text="Buscar:").place(relx=0.05, rely=0.02)
@@ -300,7 +300,7 @@ def gestionar_solicitudes():
     def Solicitudes():
         ventana_solicitudes = tk.Toplevel(ventana)
         ventana_solicitudes.title("Solicitudes Guardadas")
-        ventana_solicitudes.geometry("1100x600")
+        centrar_ventana(ventana_solicitudes, 1100, 600)
 
         tree_local = ttk.Treeview(ventana_solicitudes, columns=("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"), show="headings")
         for col in ("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"):

@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from database import conectar_bd
+from utils import ruta_relativa, centrar_ventana
+from PIL import Image, ImageTk
 import mysql.connector
 import bcrypt
 
@@ -160,6 +162,7 @@ def eliminar_usuario(tree):
         if conexion:
             conexion.close()
 
+#Interfaz de Usuario
 #Ventana para modificar usuarios
 def ventana_update(tree):
     seleccion = tree.selection()
@@ -182,9 +185,9 @@ def ventana_update(tree):
 
     ventana = tk.Toplevel()
     ventana.title("Modificar Usuario")
-    ventana.geometry("400x400")
+    centrar_ventana(ventana, 400, 400)
 
-    # Campos en orden (ahora incluimos la contraseña)
+    # Campos en orden 
     campos = ["Nombre", "Email", "Rol", "Puesto", "Nueva Contraseña"]
     entradas = []
 
@@ -206,40 +209,166 @@ def ventana_update(tree):
         ventana.destroy()
         cargar_usuarios_tree(tree)
 
-    tk.Button(ventana, text="Guardar cambios", command=guardar).place(relx=0.35, rely=0.75)
+    tk.Button(ventana, text="Guardar cambios", command=guardar, bg="blue", fg="white", font=("Arial", 10, "bold")).place(relx=0.4, rely=0.75)
+    tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.75)
 
+# Ventana para agregar usuarios
+def ventana_agregar_usuario(tree):
+    ventana = tk.Toplevel()
+    ventana.title("Agregar Usuario")
+    centrar_ventana(ventana, 600, 300)
 
-# Ventana para gestionar usuarios
+    tk.Label(ventana, text="Ingrese los datos del nuevo usuario:", font=("Arial", 12, "bold")).place(relx=0.05, rely=0.05)
+
+    tk.Label(ventana, text="Nombre:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.15)
+    entry_nombre = tk.Entry(ventana)
+    entry_nombre.place(relx=0.15, rely=0.15, relwidth=0.2)
+
+    tk.Label(ventana, text="Puesto:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.25)
+    entry_puesto = tk.Entry(ventana)
+    entry_puesto.place(relx=0.15, rely=0.25, relwidth=0.2)
+
+    tk.Label(ventana, text="Email:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.35)
+    entry_email = tk.Entry(ventana)
+    entry_email.place(relx=0.15, rely=0.335, relwidth=0.2)
+
+    tk.Label(ventana, text="Contraseña:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.45)
+    entry_password = tk.Entry(ventana)
+    entry_password.place(relx=0.20, rely=0.45, relwidth=0.2)
+
+    tk.Label(ventana, text="Rol:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.55)
+    combo_rol = ttk.Combobox(ventana, values=["Administrador", "Contador", "Comprador"])
+    combo_rol.place(relx=0.15, rely=0.55, relwidth=0.2)
+
+    # Botón Guardar
+    tk.Button(ventana, text="Guardar", command=lambda: agregar_usuario(entry_nombre, entry_email, entry_password, combo_rol, entry_puesto, tree), font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.70)
+    tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.7)
+
+def hex_a_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
+    canvas.delete("degradado")  # Limpiar el canvas antes de dibujar un nuevo degradado
+
+    rgb_inicio = hex_a_rgb(color_inicio)
+    rgb_fin = hex_a_rgb(color_fin)
+
+    pasos = alto // 2
+    for i in range(pasos):
+        y = alto - i - 1
+        r = int(rgb_inicio[0] + (rgb_fin[0] - rgb_inicio[0]) * i / pasos)
+        g = int(rgb_inicio[1] + (rgb_fin[1] - rgb_inicio[1]) * i / pasos)
+        b = int(rgb_inicio[2] + (rgb_fin[2] - rgb_inicio[2]) * i / pasos)
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        canvas.create_line(0, y, ancho, y, fill=color, tags="degradado")
+
+    canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
+
 def gestionar_usuarios():
     ventana = tk.Toplevel()
     ventana.title("Gestión de Usuarios")
-    ventana.geometry("1100x600")
+    centrar_ventana(ventana, 1100, 650)
 
-    # Etiquetas y campos (formulario superior)
-    tk.Label(ventana, text="Nombre:").place(relx=0.05, rely=0.05)
-    entry_nombre = tk.Entry(ventana)
-    entry_nombre.place(relx=0.35, rely=0.05, relwidth=0.6)
+    # Crear un canvas para el fondo
+    canvas = tk.Canvas(ventana)
+    canvas.pack(fill="both", expand=True)
 
-    tk.Label(ventana, text="Puesto:").place(relx=0.05, rely=0.15)
-    entry_puesto = tk.Entry(ventana)
-    entry_puesto.place(relx=0.35, rely=0.15, relwidth=0.6)
+    RUTA_LOGO = ruta_relativa("Plantillas/LogoATM.png")
+    RUTA_LOGO2 = ruta_relativa("Plantillas/ISO-9001.jpeg")
+    RUTA_LOGO3 = ruta_relativa("Plantillas/ISO-14001.jpeg")
+    RUTA_LOGO4 = ruta_relativa("Plantillas/ISO-45001.jpeg")
+    try:
+        # LOGO ATM
+        imagen = Image.open(RUTA_LOGO)
+        imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+        logo_img = ImageTk.PhotoImage(imagen)
+        label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
+        label_logo.image = logo_img
+        label_logo.place(relx=0.07, rely=0.01)
 
-    tk.Label(ventana, text="Email:").place(relx=0.05, rely=0.25)
-    entry_email = tk.Entry(ventana)
-    entry_email.place(relx=0.35, rely=0.25, relwidth=0.6)
+        # ISO 9001
+        iso1 = Image.open(RUTA_LOGO2).resize((70, 70), Image.Resampling.LANCZOS)
+        iso1_img = ImageTk.PhotoImage(iso1)
+        label_iso1 = tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff")
+        label_iso1.image = iso1_img
+        label_iso1.place(relx=0.90, rely=0.01, anchor="ne")  # Esquina inferior derecha
 
-    tk.Label(ventana, text="Contraseña:").place(relx=0.05, rely=0.35)
-    entry_password = tk.Entry(ventana, show="*")
-    entry_password.place(relx=0.35, rely=0.35, relwidth=0.6)
+        # ISO 14001
+        iso2 = Image.open(RUTA_LOGO3).resize((70, 70), Image.Resampling.LANCZOS)
+        iso2_img = ImageTk.PhotoImage(iso2)
+        label_iso2 = tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff")
+        label_iso2.image = iso2_img
+        label_iso2.place(relx=0.95, rely=0.15, anchor="ne")  # Al lado izquierdo del ISO 9001
 
-    tk.Label(ventana, text="Rol:").place(relx=0.05, rely=0.45)
-    combo_rol = ttk.Combobox(ventana, values=["Administrador", "Contador", "Comprador"])
-    combo_rol.place(relx=0.35, rely=0.45, relwidth=0.6)
+        # ISO 45001
+        iso3 = Image.open(RUTA_LOGO4).resize((70, 70), Image.Resampling.LANCZOS)
+        iso3_img = ImageTk.PhotoImage(iso3)
+        label_iso3 = tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff")
+        label_iso3.image = iso3_img
+        label_iso3.place(relx=0.85, rely=0.15, anchor="ne")  # Al lado izquierdo del ISO 14001
 
-    # Árbol de usuarios (ajustado para ocupar menos espacio vertical)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar el logotipo: {e}")
+        label_logo = tk.Label(canvas, text="LOGO", font=("Arial", 20, "bold"))
+    
+    label_titulo = tk.Label(canvas, text="ATM | Gestión de Usuarios",
+                            font=("Arial", 20, "bold"), fg="black", bg="white")
+
+    def actualizar_degradado(event):
+        # Obtener las dimensiones del canvas (no de la ventana Toplevel)
+        ancho = canvas.winfo_width()
+        alto = canvas.winfo_height()
+        crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
+
+    # Actualizar el fondo degradado al cambiar el tamaño de la ventana
+    canvas.bind("<Configure>", actualizar_degradado)
+
+    # Inicializar el degradado en el tamaño actual de la ventana
+    ventana.after(100, lambda: actualizar_degradado(None))
+
+    Label_busqueda = tk.Label(ventana, text="Buscar", font=("Arial", 11, "bold"), bg="white")
+    entry_busqueda = tk.Entry(canvas, width=50)
+
+    def buscar_usuarios(*args):  # Acepta *args por el trace
+        termino = entry_busqueda.get().lower()
+        for item in tree.get_children():
+            tree.delete(item)
+
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        consulta = """
+            SELECT id_usuario, nombre, email, rol, puesto FROM usuarios
+            WHERE LOWER(nombre) LIKE %s
+               OR LOWER(email) LIKE %s
+               OR LOWER(rol) LIKE %s
+               OR LOWER(puesto) LIKE %s
+               OR CAST(id_usuario AS CHAR) LIKE %s
+        """
+        like_termino = f"%{termino}%"
+        cursor.execute(consulta, (like_termino, like_termino, like_termino, like_termino, like_termino))
+        resultados = cursor.fetchall()
+        conexion.close()
+
+        for row in resultados:
+            tree.insert("", tk.END, values=row)
+
+    entry_busqueda_var = tk.StringVar()
+    entry_busqueda.config(textvariable=entry_busqueda_var)
+    entry_busqueda_var.trace("w", buscar_usuarios)  # Búsqueda automática al escribir
+
+
+    #Aplicacion del estilo a la tabla
+    style = ttk.Style()
+    style.theme_use("alt")
+    style.configure("Treeview.Heading", font=("Arial", 10, "bold"), foreground="white", background="#990000")
+    style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
+              foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
+
+    # Tabla de usuarios
     tree = ttk.Treeview(
         ventana,
-        columns=("ID", "Nombre", "Email","Rol", "Puesto"),
+        columns=("ID", "Nombre", "Email", "Rol", "Puesto"),
         show="headings"
     )
 
@@ -253,17 +382,29 @@ def gestionar_usuarios():
     tree.column("Nombre", width=250)
     tree.column("Email", width=250)
     tree.column("Rol", width=150)
-    tree.column("Puesto", width=120)
+    tree.column("Puesto", width=180)
 
-    # Ubicar el árbol con menos espacio vertical (ajustando el alto relativo)
-    tree.place(relx=0.025, rely=0.55, relwidth=0.95, relheight=0.35)
+    # Ubicación de widgets sobre el canvas
+    canvas.create_window(550, 380, window=tree, width=1000, height=300)
+    tree.place(relx=0.055, rely=0.3, relwidth=0.90, relheight=0.60)
+    canvas.create_window(600, 50, window= Label_busqueda)
+    Label_busqueda.place(relx=0.28, rely=0.25)
+    canvas.create_window(800, 50, window= entry_busqueda)
+    entry_busqueda.place(relx=0.35, rely=0.25)
+    canvas.create_window(550, 100, window=label_titulo)
+    label_titulo.place(relx=0.35, rely=0.10)
+    
+    # Botones
+    tk.Button(ventana, text="Agregar Usuario", command=lambda: ventana_agregar_usuario(tree)).place(relx=0.55, rely=0.91, relwidth=0.09, relheight=0.05)
+    tk.Button(ventana, text="Modificar Usuario", command=lambda: ventana_update(tree)).place(relx=0.65, rely=0.91, relwidth=0.09, relheight=0.05)
+    tk.Button(ventana, text="Eliminar Usuario", command=lambda: eliminar_usuario(tree)).place(relx=0.75, rely=0.91, relwidth=0.09, relheight=0.05)
+    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white").place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
 
-    # Botones de acción
-    tk.Button(ventana, text="Agregar Usuario", command=lambda: agregar_usuario(
-        entry_nombre.get(), entry_email.get(), entry_password.get(), combo_rol.get(), entry_puesto.get(),tree)).place(relx=0.2, rely=0.91, relwidth=0.2)
-    tk.Button(ventana, text="Modificar Usuario", command=lambda: ventana_update(tree)).place(relx=0.45, rely=0.91, relwidth=0.2)
-    tk.Button(ventana, text="Eliminar Usuario", command=lambda: eliminar_usuario(tree)).place(relx=0.7, rely=0.91, relwidth=0.2)
 
     # Cargar los datos
     cargar_usuarios_tree(tree)
+
     ventana.mainloop()
+
+if __name__ == "__main__":
+    gestionar_usuarios()
