@@ -4,7 +4,10 @@ from database import conectar_bd
 from utils import ruta_relativa, centrar_ventana
 from PIL import Image, ImageTk
 import mysql.connector
+import os
 import bcrypt
+from tkinter import filedialog
+import shutil
 
 
 #funcion para cargar usuarios registrados que no son administradores
@@ -21,7 +24,7 @@ def cargar_usuarios():
         cursor = conexion.cursor()
 
         # Se ejecuta la consulta
-        query = "SELECT nombre FROM usuarios WHERE rol <> 'administrador'"
+        query = "SELECT nombre FROM usuarios"
         cursor.execute(query)
         usuarios = [f"{row[0]}" for row in cursor.fetchall()]
 
@@ -36,6 +39,17 @@ def cargar_usuarios():
             cursor.close()
         if conexion:
             conexion.close()
+
+#Obtener el puesto de los usuarios
+def puesto_usuario(nombre_usuario):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    query = "SELECT puesto FROM usuarios WHERE nombre = %s"
+    cursor.execute(query, (nombre_usuario,))
+    resultado = cursor.fetchone()
+    cursor.close()
+    conexion.close()
+    return resultado[0] if resultado else ""
 
 #carga informacion de los usuarios en una TreeView
 def cargar_usuarios_tree(tree):
@@ -52,6 +66,14 @@ def cargar_usuarios_tree(tree):
 
     cursor.close()
     conexion.close()
+
+#Funcion para seleccionar firma desde los archivos
+def seleccionar_firma(entry_firma):
+    archivo = filedialog.askopenfilename(filetypes=[("Imágenes PNG", "*.png"), ("Todos los archivos", "*.*")])
+    if archivo:
+        entry_firma.delete(0, tk.END)
+        entry_firma.insert(0, archivo)
+
 
 #Funcion para modificar los usuarios en la base de datos
 def modificar_usuario(id_usuario, nombre, email, rol, puesto, nueva_password, password_actual):
@@ -87,42 +109,56 @@ def modificar_usuario(id_usuario, nombre, email, rol, puesto, nueva_password, pa
 
 
 #Funcion para agregar un usuario nuevo
-def agregar_usuario(nombre, email, password, rol, puesto, tree):
-    if not (nombre and email and password and rol and puesto):
+def agregar_usuario(nombre, email, password, rol, puesto, firma_original, tree):
+    if not (nombre and email and password and rol and puesto and firma_original):
         messagebox.showwarning("Campos vacíos", "Por favor, llena todos los campos.")
         return
-    
+
     password_encrypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8') if password else None
-    
-    conexion = None
-    cursor = None
 
     try:
+        # ✅ Crear carpeta de firmas si no existe
+        carpeta_firmas = ruta_relativa("Firmas")
+        if not os.path.exists(carpeta_firmas):
+            os.makedirs(carpeta_firmas)
+
+        # ✅ Generar nombre único para la firma (puede ser con nombre de usuario o email)
+        nombre_archivo = f"firma_{nombre.lower().replace(' ', '_')}.png"
+        destino = os.path.join(carpeta_firmas, nombre_archivo)
+
+        # ✅ Copiar la firma al destino
+        shutil.copy(firma_original, destino)
+
+        # ✅ Guardar solo la ruta relativa
+        ruta_firma = os.path.join("Firmas", nombre_archivo)
+
         # Conexión a la base de datos
         conexion = conectar_bd()
         if conexion is None:
-            print("❌No se pudo establecer la conexion")
+            print("❌No se pudo establecer la conexión")
             return
         cursor = conexion.cursor()
 
-        # Ejecuta la consulta
-        query = "INSERT INTO Usuarios (nombre, email, password, rol, puesto) VALUES (%s, %s, %s, %s, %s)"
-        cursor.execute(query, (nombre, email, password_encrypted, rol, puesto))
+        query = """
+            INSERT INTO usuarios (nombre, email, password, rol, puesto, ruta_firma)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        cursor.execute(query, (nombre, email, password_encrypted, rol, puesto, ruta_firma))
         conexion.commit()
 
-        messagebox.showinfo("✅Éxito", "Usuario registrado correctamente.")
-
+        messagebox.showinfo("✅ Éxito", "Usuario registrado correctamente.")
         cargar_usuarios_tree(tree)
-   
-    except mysql.connector.Error as e:
-        messagebox.showerror("❌Error", "Usuario no agregado: {e}")
+
+    except Exception as e:
+        messagebox.showerror("❌ Error", f"No se pudo registrar el usuario: {e}")
+        if conexion:
+            conexion.rollback()
 
     finally:
         if cursor:
             cursor.close()
         if conexion:
             conexion.close()
-
 
 #Funcion para eliminar usuarios
 def eliminar_usuario(tree):
@@ -209,7 +245,7 @@ def ventana_update(tree):
         ventana.destroy()
         cargar_usuarios_tree(tree)
 
-    tk.Button(ventana, text="Guardar cambios", command=guardar, bg="blue", fg="white", font=("Arial", 10, "bold")).place(relx=0.4, rely=0.75)
+    tk.Button(ventana, text="Guardar cambios", command=guardar, bg="blue", font=("Arial", 10, "bold")).place(relx=0.4, rely=0.75)
     tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.75)
 
 # Ventana para agregar usuarios
@@ -221,28 +257,34 @@ def ventana_agregar_usuario(tree):
     tk.Label(ventana, text="Ingrese los datos del nuevo usuario:", font=("Arial", 12, "bold")).place(relx=0.05, rely=0.05)
 
     tk.Label(ventana, text="Nombre:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.15)
-    entry_nombre = tk.Entry(ventana)
+    entry_nombre = ttk.Entry(ventana)
     entry_nombre.place(relx=0.15, rely=0.15, relwidth=0.2)
 
     tk.Label(ventana, text="Puesto:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.25)
-    entry_puesto = tk.Entry(ventana)
+    entry_puesto = ttk.Entry(ventana)
     entry_puesto.place(relx=0.15, rely=0.25, relwidth=0.2)
 
     tk.Label(ventana, text="Email:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.35)
-    entry_email = tk.Entry(ventana)
+    entry_email = ttk.Entry(ventana)
     entry_email.place(relx=0.15, rely=0.335, relwidth=0.2)
 
     tk.Label(ventana, text="Contraseña:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.45)
-    entry_password = tk.Entry(ventana)
+    entry_password = ttk.Entry(ventana)
     entry_password.place(relx=0.20, rely=0.45, relwidth=0.2)
 
     tk.Label(ventana, text="Rol:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.55)
-    combo_rol = ttk.Combobox(ventana, values=["Administrador", "Contador", "Comprador"])
+    combo_rol = ttk.Combobox(ventana, values=["Administrador", "Contador", "Comprador", "Gerente"])
     combo_rol.place(relx=0.15, rely=0.55, relwidth=0.2)
 
+    tk.Label(ventana, text="Firma (PNG):", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.65)
+    entry_firma = ttk.Entry(ventana)
+    entry_firma.place(relx=0.20, rely=0.65, relwidth=0.2)
+    tk.Button(ventana, text="Seleccionar", command=lambda: seleccionar_firma(entry_firma), font=("Arial", 10,"bold")).place(relx=0.45, rely=0.65, relwidth=0.2)
+
+
     # Botón Guardar
-    tk.Button(ventana, text="Guardar", command=lambda: agregar_usuario(entry_nombre, entry_email, entry_password, combo_rol, entry_puesto, tree), font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.70)
-    tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.7)
+    tk.Button(ventana, text="Guardar", command=lambda: agregar_usuario(entry_nombre.get(), entry_email.get(), entry_password.get(), combo_rol.get(), entry_puesto.get(), entry_firma.get(), tree), font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.85)
+    tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.85)
 
 def hex_a_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
@@ -328,7 +370,7 @@ def gestionar_usuarios():
     ventana.after(100, lambda: actualizar_degradado(None))
 
     Label_busqueda = tk.Label(ventana, text="Buscar", font=("Arial", 11, "bold"), bg="white")
-    entry_busqueda = tk.Entry(canvas, width=50)
+    entry_busqueda = ttk.Entry(canvas, width=50)
 
     def buscar_usuarios(*args):  # Acepta *args por el trace
         termino = entry_busqueda.get().lower()
@@ -395,10 +437,10 @@ def gestionar_usuarios():
     label_titulo.place(relx=0.35, rely=0.10)
     
     # Botones
-    tk.Button(ventana, text="Agregar Usuario", command=lambda: ventana_agregar_usuario(tree)).place(relx=0.55, rely=0.91, relwidth=0.09, relheight=0.05)
-    tk.Button(ventana, text="Modificar Usuario", command=lambda: ventana_update(tree)).place(relx=0.65, rely=0.91, relwidth=0.09, relheight=0.05)
-    tk.Button(ventana, text="Eliminar Usuario", command=lambda: eliminar_usuario(tree)).place(relx=0.75, rely=0.91, relwidth=0.09, relheight=0.05)
-    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white").place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
+    tk.Button(ventana, text="Agregar Usuario", command=lambda: ventana_agregar_usuario(tree), font=("Arial", 10,"bold")).place(relx=0.52, rely=0.91, relwidth=0.1, relheight=0.05)
+    tk.Button(ventana, text="Modificar Usuario", command=lambda: ventana_update(tree), font=("Arial", 10,"bold")).place(relx=0.65, rely=0.91, relwidth=0.11, relheight=0.05)
+    tk.Button(ventana, text="Eliminar Usuario", command=lambda: eliminar_usuario(tree), font=("Arial", 10,"bold")).place(relx=0.78, rely=0.91, relwidth=0.1, relheight=0.05)
+    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
 
 
     # Cargar los datos

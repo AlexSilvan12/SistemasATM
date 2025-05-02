@@ -1,12 +1,17 @@
 import tkinter as tk
-from tkinter import messagebox
-from tkinter import ttk
+from tkinter import messagebox, ttk, filedialog
+from PIL import Image, ImageTk
 from database import conectar_bd
-from utils import ruta_relativa, centrar_ventana
+from utils import ruta_relativa, centrar_ventana, convertir_excel_a_pdf
+from login import usuario_actual
+from Correos import enviar_documentos_a_gerente
+from login import usuario_actual
+
 from openpyxl import load_workbook
 import mysql.connector
 import os
 from openpyxl.styles import Alignment
+from openpyxl.drawing.image import Image as ExcelImage
 
 # Función para conectar con las solicitudes almacenadas en la base de datos
 def cargar_solicitudes(tree):
@@ -130,9 +135,9 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
                     INSERT INTO SolicitudesPago (
                     id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud, 
                     importe, instruccion, referencia_pago, concepto, 
-                    fecha_recibido_revision, fecha_limite_pago, num_facturas, proyecto_contrato
+                    fecha_recibido_revision, fecha_limite_pago, num_facturas, proyecto_contrato, estado
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente')
             """
                 cursor.execute(query, (
                 id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud,
@@ -156,12 +161,12 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 
     # Generar el archivo Excel
     generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
-                  referencia_pago, fechalimite, concepto, factura, *proveedor)
+                  referencia_pago, fechalimite, concepto, factura, *proveedor, usuario_actual["nombre"])
 
 
 # Función que llena la plantilla Excel con los datos
 def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
-                  referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco):
+                  referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco, nombre_usuario):
     
     try:
         # Plantilla de solicitud de pago
@@ -203,29 +208,119 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
         escribir(15, 3, instruccion, combinar="C15:E15")         # C15 - Instrucción
         escribir(22, 10, referencia_pago, combinar="J22:L22")    # J22 - Referencia de pago
         escribir(25, 3, concepto, combinar="C25:L25")            # C25 - Concepto
+        escribir(38, 3, nombre_usuario, combinar="C38:F38")      # C37 - Solicitante de Pago
 
-        # Guardar y abrir
+        ruta_firma = ruta_relativa(usuario_actual["firma"])
+
+        # Insertar imagen
+        firma_img = ExcelImage(ruta_firma)
+        firma_img.width =160 #ajustar tamaño
+        firma_img.height = 50
+        sheet.add_image(firma_img, "D37")
+
+        # Guardar Excel
         CARPETA_SOLICITUDES = ruta_relativa("Solicitudes")
         output_path = os.path.join(CARPETA_SOLICITUDES, f"Solicitud de Pago_{id_solicitud}.xlsx")
         wb.save(output_path)
 
-        messagebox.showinfo("✅ Éxito", f"Archivo generado: {output_path}")
-        os.startfile(output_path)
+        # Convertir a PDF (la función se encarga de abrirlo)
+        ruta_pdf = output_path.replace(".xlsx", ".pdf")
+        convertir_excel_a_pdf(output_path, ruta_pdf)
+
+        os.startfile(ruta_pdf)
+
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo generar el Excel:\n{e}")
 
 
 # Interfaz gráfica
+def hex_a_rgb(hex_color):
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
+    canvas.delete("degradado")  # Limpiar el canvas antes de dibujar un nuevo degradado
+
+    rgb_inicio = hex_a_rgb(color_inicio)
+    rgb_fin = hex_a_rgb(color_fin)
+
+    pasos = alto // 2
+    for i in range(pasos):
+        y = alto - i - 1
+        r = int(rgb_inicio[0] + (rgb_fin[0] - rgb_inicio[0]) * i / pasos)
+        g = int(rgb_inicio[1] + (rgb_fin[1] - rgb_inicio[1]) * i / pasos)
+        b = int(rgb_inicio[2] + (rgb_fin[2] - rgb_inicio[2]) * i / pasos)
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        canvas.create_line(0, y, ancho, y, fill=color, tags="degradado")
+
+    canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
+
+
 def gestionar_solicitudes():
     ventana = tk.Toplevel()
     ventana.title("Solicitudes de Pago")
     centrar_ventana(ventana, 1000, 600)
 
+    canvas = tk.Canvas(ventana)
+    canvas.pack(fill="both", expand=True)
+
+
+    def actualizar_degradado(event):
+        # Obtener las dimensiones del canvas
+        ancho = canvas.winfo_width()
+        alto = canvas.winfo_height()
+        crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
+
+    # Actualizar el fondo degradado al cambiar el tamaño de la ventana
+    canvas.bind("<Configure>", actualizar_degradado)
+
+    # Inicializar el degradado en el tamaño actual de la ventana
+    ventana.after(100, lambda: actualizar_degradado(None))
+
+    RUTA_LOGO = ruta_relativa("Plantillas/LogoATM.png")
+    RUTA_LOGO2 = ruta_relativa("Plantillas/ISO-9001.jpeg")
+    RUTA_LOGO3 = ruta_relativa("Plantillas/ISO-14001.jpeg")
+    RUTA_LOGO4 = ruta_relativa("Plantillas/ISO-45001.jpeg")
+    try:
+        # LOGO ATM
+        imagen = Image.open(RUTA_LOGO)
+        imagen = imagen.resize((120, 130), Image.Resampling.LANCZOS)
+        logo_img = ImageTk.PhotoImage(imagen)
+        label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
+        label_logo.image = logo_img
+        label_logo.place(relx=0.05, rely=0.015)
+
+        # ISO 9001
+        iso1 = Image.open(RUTA_LOGO2).resize((60, 60), Image.Resampling.LANCZOS)
+        iso1_img = ImageTk.PhotoImage(iso1)
+        label_iso1 = tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff")
+        label_iso1.image = iso1_img
+        label_iso1.place(relx=0.30, rely=0.020, anchor="ne")  # Esquina inferior derecha
+
+        # ISO 14001
+        iso2 = Image.open(RUTA_LOGO3).resize((60, 60), Image.Resampling.LANCZOS)
+        iso2_img = ImageTk.PhotoImage(iso2)
+        label_iso2 = tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff")
+        label_iso2.image = iso2_img
+        label_iso2.place(relx=0.35, rely=0.13, anchor="ne")  # Al lado izquierdo del ISO 9001
+
+        # ISO 45001
+        iso3 = Image.open(RUTA_LOGO4).resize((60, 60), Image.Resampling.LANCZOS)
+        iso3_img = ImageTk.PhotoImage(iso3)
+        label_iso3 = tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff")
+        label_iso3.image = iso3_img
+        label_iso3.place(relx=0.25, rely=0.13, anchor="ne")  # Al lado izquierdo del ISO 14001
+
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar el logotipo: {e}")
+        label_logo = tk.Label(canvas, text="LOGO", font=("Arial", 20, "bold"))
+
+
     # Buscar
-    tk.Label(ventana, text="Buscar:").place(relx=0.05, rely=0.02)
+    tk.Label(ventana, text="Buscar:", font=("Arial", 10, "bold"), bg="white").place(relx=0.05, rely=0.28)
     entry_busqueda = tk.Entry(ventana, width=50)
-    entry_busqueda.place(relx=0.1, rely=0.02)
+    entry_busqueda.place(relx=0.13, rely=0.28)
 
     def buscar(*args):  # Acepta *args por el trace
         termino = entry_busqueda.get().lower()
@@ -264,25 +359,34 @@ def gestionar_solicitudes():
     entry_busqueda.config(textvariable=entry_busqueda_var)
     entry_busqueda_var.trace("w", buscar)  # Búsqueda automática al escribir
 
+    tk.Label(ventana, text="Ingrese la informacion de la solicitud:", font=("Arial", 12, "bold"), bg="white").place(relx=0.60, rely=0.02)
+
     # Consecutivo
-    tk.Label(ventana, text="Consecutivo de Solicitud:").place(relx=0.05, rely=0.08)
+    tk.Label(ventana, text="Consecutivo:", font=("Arial", 10, "bold"), bg="white").place(relx=0.60, rely=0.1)
     entry_consecutivo = tk.Entry(ventana, width=30)
-    entry_consecutivo.place(relx=0.20, rely=0.08)
+    entry_consecutivo.place(relx=0.70, rely=0.1)
 
     # Concepto
-    tk.Label(ventana, text="Concepto:").place(relx=0.05, rely=0.14)
-    entry_concepto = tk.Entry(ventana, width=70)
-    entry_concepto.place(relx=0.12, rely=0.14)
+    tk.Label(ventana, text="Concepto:", font=("Arial", 10, "bold"), bg="white").place(relx=0.60, rely=0.16)
+    entry_concepto = tk.Entry(ventana, width=30)
+    entry_concepto.place(relx=0.70, rely=0.16)
 
     # Referencia de Pago
-    tk.Label(ventana, text="Referencia de Pago:").place(relx=0.05, rely=0.20)
-    entry_referencia = tk.Entry(ventana, width=40)
-    entry_referencia.place(relx=0.17, rely=0.20)
+    tk.Label(ventana, text="Referencia de Pago:", font=("Arial", 10, "bold"), bg="white").place(relx=0.60, rely=0.22)
+    entry_referencia = tk.Entry(ventana, width=30)
+    entry_referencia.place(relx=0.75, rely=0.22)
 
     #Numero de Factura
-    tk.Label(ventana, text="Numero de Factura:").place(relx=0.05, rely=0.26)
+    tk.Label(ventana, text="Numero de Factura:", font=("Arial", 10, "bold"), bg="white").place(relx=0.60, rely=0.28)
     entry_factura = tk.Entry(ventana, width=30)
-    entry_factura.place(relx=0.17, rely=0.26)
+    entry_factura.place(relx=0.75, rely=0.28)
+
+    #Aplicacion del estilo a la tabla
+    style = ttk.Style()
+    style.theme_use("alt")
+    style.configure("Treeview.Heading", font=("Arial", 10, "bold"), foreground="white", background="#990000")
+    style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
+              foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
     # Treeview (tabla)
     tree = ttk.Treeview(ventana, columns=("ID", "Fecha", "Monto", "Proyecto"), show="headings")
@@ -293,8 +397,8 @@ def gestionar_solicitudes():
     scrollbar = ttk.Scrollbar(ventana, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
 
-    tree.place(relx=0.05, rely=0.32, relwidth=0.88, relheight=0.55)
-    scrollbar.place(relx=0.93, rely=0.32, relheight=0.55)
+    tree.place(relx=0.05, rely=0.33, relwidth=0.88, relheight=0.55)
+    scrollbar.place(relx=0.93, rely=0.33, relheight=0.55)
 
     # Ventana de solicitudes guardadas
     def Solicitudes():
@@ -302,24 +406,46 @@ def gestionar_solicitudes():
         ventana_solicitudes.title("Solicitudes Guardadas")
         centrar_ventana(ventana_solicitudes, 1100, 600)
 
-        tree_local = ttk.Treeview(ventana_solicitudes, columns=("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"), show="headings")
+        #Aplicacion del estilo a la tabla
+        style = ttk.Style()
+        style.theme_use("alt")
+        style.configure("Treeview.Heading", font=("Arial", 10, "bold"), foreground="white", background="#990000")
+        style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
+                foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
+
+        # Frame con tamaño más controlado
+        frame_tabla = tk.Frame(ventana_solicitudes)
+        frame_tabla.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.75)  # ⬅️ Ajusta tamaño aquí
+
+        tree_local = ttk.Treeview(frame_tabla, columns=("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"), show="headings")
         for col in ("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"):
             tree_local.heading(col, text=col)
 
-        tree_local.pack(fill="both", expand=True, padx=10, pady=10)
+        tree_local.place(relx=0, rely=0, relwidth=0.97, relheight=1)  # ⬅️ Ajusta si quieres más separación
 
-        scrollbar_local = ttk.Scrollbar(ventana_solicitudes, orient="vertical", command=tree_local.yview)
+        scrollbar_local = ttk.Scrollbar(frame_tabla, orient="vertical", command=tree_local.yview)
         tree_local.configure(yscrollcommand=scrollbar_local.set)
-        scrollbar_local.pack(side="right", fill="y")
+        scrollbar_local.place(relx=0.97, rely=0, relwidth=0.03, relheight=1)  # ⬅️ Posición vertical a la derecha
+
+        tk.Button(ventana_solicitudes, text="Salir", command=ventana_solicitudes.destroy,
+                bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
 
         cargar_solicitudes(tree_local)
 
     # Botones
     tk.Button(ventana, text="Generar Excel",
-              command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura)
-             ).place(relx=0.40, rely=0.88)
+              command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura), font=("Arial", 10, "bold")
+             ).place(relx=0.40, rely=0.91, relwidth=0.097, relheight=0.05)
 
-    tk.Button(ventana, text="Solicitudes Guardadas", command=Solicitudes).place(relx=0.58, rely=0.88)
+    tk.Button(ventana, text="Solicitudes Guardadas", command=Solicitudes, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.91, relwidth=0.15, relheight=0.05)
+    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.91, relwidth=0.095, relheight=0.05)
+    tk.Button(ventana, text="Enviar Archivos", command=lambda: enviar_documentos_a_gerente(usuario_actual), bg="#0066CC", fg="white", font=("Arial", 10, "bold")
+              ).place(relx=0.55, rely=0.91, relwidth=0.12, relheight=0.05)
+
+
 
     cargar_autorizaciones(tree)
     ventana.mainloop()
+
+if __name__ == "__main__":
+    gestionar_solicitudes()

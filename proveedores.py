@@ -204,7 +204,6 @@ def ventana_update(tree):
 
 
 #Interfaz de Usuario
-
 def ventana_agregar_proveedor(tree):
     ventana = tk.Toplevel()
     ventana.title("Agregar Proveedor")
@@ -326,7 +325,7 @@ def gestionar_proveedores():
                             font=("Arial", 20, "bold"), fg="black", bg="white")
     
     def actualizar_degradado(event):
-        # Obtener las dimensiones del canvas (no de la ventana Toplevel)
+        # Obtener las dimensiones del canvas
         ancho = canvas.winfo_width()
         alto = canvas.winfo_height()
         crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
@@ -338,7 +337,7 @@ def gestionar_proveedores():
     ventana.after(100, lambda: actualizar_degradado(None))
 
     Label_busqueda = tk.Label(ventana, text="Buscar", font=("Arial", 11, "bold"), bg="white")
-    entry_busqueda = tk.Entry(canvas, width=50)
+    entry_busqueda = ttk.Entry(canvas, width=50)
 
 
     def buscar_proveedores(*args):  # Acepta *args por el trace
@@ -405,10 +404,10 @@ def gestionar_proveedores():
     canvas.create_window(550, 100, window=label_titulo)
     label_titulo.place(relx=0.35, rely=0.10)
 
-    tk.Button(ventana, text="Agregar Proveedor", command=lambda: ventana_agregar_proveedor(tree)).place(relx=0.55, rely=0.91, relwidth=0.095, relheight=0.05)
-    tk.Button(ventana, text="Modificar proveedor", command=lambda: ventana_update(tree)).place(relx=0.65, rely=0.91, relwidth=0.095, relheight=0.05)
-    tk.Button(ventana, text="Eliminar proveedor", command=lambda: eliminar_proveedor(tree)).place(relx=0.75, rely=0.91, relwidth=0.095, relheight=0.05)
-    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white").place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
+    tk.Button(ventana, text="Agregar Proveedor", command=lambda: ventana_agregar_proveedor(tree), font=("Arial", 10,"bold")).place(relx=0.52, rely=0.91, relwidth=0.11, relheight=0.05)
+    tk.Button(ventana, text="Modificar Proveedor", command=lambda: ventana_update(tree), font=("Arial", 10,"bold")).place(relx=0.65, rely=0.91, relwidth=0.12, relheight=0.05)
+    tk.Button(ventana, text="Eliminar Proveedor", command=lambda: eliminar_proveedor(tree), font=("Arial", 10,"bold")).place(relx=0.78, rely=0.91, relwidth=0.11, relheight=0.05)
+    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
 
 
     cargar_proveedores_tree(tree)

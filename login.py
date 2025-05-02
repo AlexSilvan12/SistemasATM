@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk 
 import mysql.connector
 from database import conectar_bd
 from PIL import Image, ImageTk
@@ -7,59 +7,71 @@ import os
 import bcrypt
 from utils import ruta_relativa, centrar_ventana
 
-def verificar_credenciales(email, password):
+# Variable global para guardar info del usuario actual
+usuario_actual = {
+    "nombre": None,
+    "rol": None,
+    "firma": None,
+    "puesto": None,
+    "email": None
+}
 
+def verificar_credenciales(email, password):
     if not email or not password:
         messagebox.showwarning("Campos vacíos", "Por favor, ingresa tus credenciales.")
         return None
-        
+
     conexion = None
     cursor = None
 
     try:
-        # Conectar a la base de datos
         conexion = conectar_bd()
         if conexion is None:
             print("❌ No se pudo establecer la conexión")
             return None
         cursor = conexion.cursor()
 
-        # Obtener la contraseña cifrada de la base de datos
-        query = "SELECT password, rol FROM Usuarios WHERE email = %s"
+        query = "SELECT nombre, password, rol, puesto, ruta_firma FROM Usuarios WHERE email = %s"
         cursor.execute(query, (email,))
         resultado = cursor.fetchone()
 
         if resultado:
-            contraseña_guardada, rol = resultado
-            # Verificar si la contraseña ingresada coincide con la cifrada
+            nombre, contraseña_guardada, rol, puesto, ruta_firma = resultado
             if bcrypt.checkpw(password.encode('utf-8'), contraseña_guardada.encode('utf-8')):
-                return rol  # Retorna el rol si la contraseña es correcta
+                return {
+                    "nombre": nombre,
+                    "rol": rol,
+                    "firma": ruta_firma,
+                    "puesto": puesto
+                }
 
-        return None  # Si la contraseña no coincide o el usuario no existe
+        return None
     
     except mysql.connector.Error as e:
         messagebox.showerror("❌ Error de conexión", f"No se pudo conectar a la base de datos: {e}")
 
     finally:
-        if cursor is not None:
+        if cursor:
             cursor.close()
-        if conexion is not None:
-            conexion.close()  
+        if conexion:
+            conexion.close()
 
-#Funcion para manejar la logica de la GUI
 def validar_usuario(entry_email, entry_password, root):
-
     from main_menu import abrir_menu
+    global usuario_actual
 
-    #Recibe los datos desde la intefaz
     email = entry_email.get()
     password = entry_password.get()
-    rol = verificar_credenciales(email, password)
+    datos = verificar_credenciales(email, password)
 
-    #Condicion para abrir el menú especifico segun el rol
-    if rol:
+    if datos:
+        usuario_actual["nombre"] = datos["nombre"]
+        usuario_actual["rol"] = datos["rol"]
+        usuario_actual["firma"] = datos["firma"]
+        usuario_actual["puesto"] = datos["puesto"]
+
         root.destroy()
-        abrir_menu(rol)
+        abrir_menu(datos["rol"])
     else:
         messagebox.showerror("❌Error", "Credenciales incorrectas")
 
@@ -137,10 +149,10 @@ def ventana_login():
                             font=("Arial", 14, "bold"), fg="black", bg="white")
 
     label_usuario = tk.Label(canvas, text="Usuario:", font=("Arial", 11, "bold"), bg="white")
-    entry_usuario = tk.Entry(canvas, width=30)
+    entry_usuario = ttk.Entry(canvas, width=30)
 
     label_contraseña = tk.Label(canvas, text="Contraseña:", font=("Arial", 11, "bold"))
-    entry_contraseña = tk.Entry(canvas, show="*", width=30)
+    entry_contraseña = ttk.Entry(canvas, show="*", width=30)
 
     footer = tk.Label(
     canvas,
@@ -152,7 +164,7 @@ def ventana_login():
     footer.place(relx=0.5, rely=0.98, anchor="s")
 
 
-    btn_ingresar = tk.Button(canvas, text="Ingresar", width=20, bg="#283593", fg="white",
+    btn_ingresar = tk.Button(canvas, text="Ingresar", width=20, bg="#283593", fg="white", font=("Arial", 10, "bold"),
                              command=lambda: validar_usuario(entry_usuario, entry_contraseña, ventana))
 
     btn_salir = tk.Button(canvas, text="Salir", width=15, bg="black", fg="white",

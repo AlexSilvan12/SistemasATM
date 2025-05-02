@@ -5,6 +5,7 @@ from proveedores import gestionar_proveedores
 from solicitudes import gestionar_solicitudes
 from autorizaciones import gestionar_autorizaciones
 from usuarios import gestionar_usuarios
+from Gerente import Autorizacion_Pagos_Compras
 from utils import ruta_relativa, centrar_ventana
 import login
 
@@ -62,21 +63,21 @@ def abrir_menu(rol):
         iso1_img = ImageTk.PhotoImage(iso1)
         label_iso1 = tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff")
         label_iso1.image = iso1_img
-        label_iso1.place(relx=0.90, rely=0.01, anchor="ne")  # Esquina inferior derecha
+        label_iso1.place(relx=0.90, rely=0.01, anchor="ne")  
 
         # ISO 14001
         iso2 = Image.open(RUTA_LOGO3).resize((70, 70), Image.Resampling.LANCZOS)
         iso2_img = ImageTk.PhotoImage(iso2)
         label_iso2 = tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff")
         label_iso2.image = iso2_img
-        label_iso2.place(relx=0.95, rely=0.15, anchor="ne")  # Al lado izquierdo del ISO 9001
+        label_iso2.place(relx=0.95, rely=0.15, anchor="ne")  
 
         # ISO 45001
         iso3 = Image.open(RUTA_LOGO4).resize((70, 70), Image.Resampling.LANCZOS)
         iso3_img = ImageTk.PhotoImage(iso3)
         label_iso3 = tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff")
         label_iso3.image = iso3_img
-        label_iso3.place(relx=0.85, rely=0.15, anchor="ne")  # Al lado izquierdo del ISO 14001
+        label_iso3.place(relx=0.85, rely=0.15, anchor="ne")  
     except Exception as e:
         print(f"⚠️ No se pudo cargar el logotipo: {e}")
         label_logo = tk.Label(canvas, text="LOGO", font=("Arial", 20, "bold"))
@@ -91,8 +92,8 @@ def abrir_menu(rol):
         ]
     elif rol == "Contador":
         botones = [
-            ("Gestión de Solicitudes", gestionar_solicitudes),
             ("Gestión de Autorizaciones", gestionar_autorizaciones),
+            ("Gestión de Solicitudes", gestionar_solicitudes),
             ("Gestión de Proveedores", gestionar_proveedores)
         ]
     elif rol == "Comprador":
@@ -101,11 +102,21 @@ def abrir_menu(rol):
             ("Gestión de Solicitudes", gestionar_solicitudes),
             ("Gestión de Proveedores", gestionar_proveedores)
         ]
+    elif rol == "Gerente":
+        botones = [
+            ("Gestión de Autorizaciones", gestionar_autorizaciones),
+            ("Gestión de Solicitudes", gestionar_solicitudes),
+            ("Gestión de Proveedores", gestionar_proveedores),
+            ("Autorizaciones de Compra y Solicitudes de Pago por Autorizar", Autorizacion_Pagos_Compras)            
+        ]
 
     widgets = {'logo': canvas.create_window(400, 100, window=label_logo)}
     y_base = 240
     for i, (texto, comando) in enumerate(botones):
-        btn = tk.Button(canvas, text=texto, width=30, height=2, font=("Arial", 10, "bold"), command=comando)
+        if texto == "Autorizaciones de Compra y Solicitudes de Pago por Autorizar":
+            btn = tk.Button(canvas, text=texto, width=50, height=2, font=("Arial", 10, "bold"), command=comando)
+        else:
+            btn = tk.Button(canvas, text=texto, width=30, height=2, font=("Arial", 10, "bold"), command=comando)
         widgets[f"btn_{i}"] = canvas.create_window(400, y_base + i * 60, window=btn)
 
     btn_cerrar = tk.Button(canvas, text="Cerrar sesión", width=15, bg="#cc0000", fg="white",
