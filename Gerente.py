@@ -27,7 +27,8 @@ def cargar_autorizaciones_pendientes(tree):
             ac.solicitante, 
             ac.monto, 
             ac.fecha_requerida,
-            GROUP_CONCAT(aa.articulo SEPARATOR ', ') AS descripcion
+            GROUP_CONCAT(aa.articulo SEPARATOR ', ') AS descripcion,
+            GROUP_CONCAT(aa.observaciones SEPARATOR ', ') AS observaciones
         FROM 
             autorizacionescompra ac
         LEFT JOIN 
@@ -59,11 +60,42 @@ def cargar_solicitudes_pendientes(tree):
     tree.delete(*tree.get_children())
     conexion = conectar_bd()
     cursor = conexion.cursor()
-    cursor.execute("SELECT id_solicitud, importe, fecha_solicitud, proyecto_contrato, concepto FROM solicitudespago WHERE estado = 'Pendiente'")
-    for fila in cursor.fetchall():
-        tree.insert("", tk.END, values=fila)
-    cursor.close()
-    conexion.close()
+    try:
+        consulta = """
+        SELECT 
+            sp.id_solicitud, 
+            sp.importe, 
+            sp.fecha_solicitud, 
+            sp.concepto,
+            GROUP_CONCAT(c.contrato SEPARATOR ', ') AS contratos
+        FROM 
+            solicitudespago sp
+        LEFT JOIN 
+            solicitud_contratos sc ON sp.id_solicitud = sc.id_solicitud
+        LEFT JOIN 
+            contratos c ON sc.id_contrato = c.id_contrato
+        WHERE 
+            sp.estado = 'Pendiente'
+        GROUP BY 
+            sp.id_solicitud, sp.importe, sp.fecha_solicitud, sp.concepto 
+        """
+        cursor.execute(consulta)
+        solicitudes = cursor.fetchall()
+
+         # Limpiar primero
+        for item in tree.get_children():
+            tree.delete(item)
+
+        # Insertar filas
+        for aut in solicitudes:
+            tree.insert("", tk.END, values=aut)   
+
+    except mysql.connector.Error as e:
+        messagebox.showerror("Error", f"No se pudo cargar solicitudes: {e}")
+
+    finally:
+        cursor.close()
+        conexion.close()
 
 
 # Funcion para autorizar las autorizaciones de compras
@@ -163,8 +195,60 @@ def autorizar_solicitud_pago(tree):
         cursor.close()
         conexion.close()
 
+def mostrar_detalles_autorizacion(id_autorizacion):
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
 
+    try:
+        cursor.execute("""
+            SELECT articulo, observaciones
+            FROM articulosautorizacion
+            WHERE id_autorizacion = %s
+        """, (id_autorizacion,))
+        articulos = cursor.fetchall()
 
+        if not articulos:
+            messagebox.showinfo("Sin datos", "No hay artículos registrados para esta autorización.")
+            return
+
+        # Crear ventana emergente
+        detalle_ventana = tk.Toplevel()
+        detalle_ventana.title(f"Detalles de Autorización {id_autorizacion}")
+        detalle_ventana.geometry("600x400")
+
+        # Text widget para mostrar los datos
+        texto = tk.Text(detalle_ventana, wrap="word", font=("Arial", 11))
+        texto.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for art, obs in articulos:
+            texto.insert("end", f"🛒 Artículo: {art}\n📝 Observaciones: {obs}\n\n")
+
+        texto.config(state="disabled")  # Solo lectura
+
+    except mysql.connector.Error as e:
+        messagebox.showerror("Error", f"No se pudieron obtener los detalles:\n{e}")
+    finally:
+        cursor.close()
+        conexion.close()
+
+def hex_a_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
+    canvas.delete("degradado")
+    rgb_inicio = hex_a_rgb(color_inicio)
+    rgb_fin = hex_a_rgb(color_fin)
+    pasos = alto // 2
+    for i in range(pasos):
+        y = alto - i - 1
+        r = int(rgb_inicio[0] + (rgb_fin[0] - rgb_inicio[0]) * i / pasos)
+        g = int(rgb_inicio[1] + (rgb_fin[1] - rgb_inicio[1]) * i / pasos)
+        b = int(rgb_inicio[2] + (rgb_fin[2] - rgb_inicio[2]) * i / pasos)
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        canvas.create_line(0, y, 1100, y, fill=color, tags="degradado")
+        canvas.create_rectangle(0, 0, 1100, alto // 2, fill=color_fin, outline="", tags="degradado")
+        
 def Autorizacion_Pagos_Compras():
     ventana = tk.Toplevel()
     ventana.title("Gestión de Solicitudes y Autorizaciones")
@@ -172,24 +256,6 @@ def Autorizacion_Pagos_Compras():
 
     canvas = tk.Canvas(ventana)
     canvas.pack(fill="both", expand=True)
-
-    def hex_a_rgb(hex_color):
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-
-    def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
-        canvas.delete("degradado")
-        rgb_inicio = hex_a_rgb(color_inicio)
-        rgb_fin = hex_a_rgb(color_fin)
-        pasos = alto // 2
-        for i in range(pasos):
-            y = alto - i - 1
-            r = int(rgb_inicio[0] + (rgb_fin[0] - rgb_inicio[0]) * i / pasos)
-            g = int(rgb_inicio[1] + (rgb_fin[1] - rgb_inicio[1]) * i / pasos)
-            b = int(rgb_inicio[2] + (rgb_fin[2] - rgb_inicio[2]) * i / pasos)
-            color = f"#{r:02x}{g:02x}{b:02x}"
-            canvas.create_line(0, y, 1100, y, fill=color, tags="degradado")
-        canvas.create_rectangle(0, 0, 1100, alto // 2, fill=color_fin, outline="", tags="degradado")
 
     canvas.bind("<Configure>", lambda event: crear_degradado_vertical(canvas, event.width, event.height, "#8B0000", "#FFFFFF"))
     ventana.after(100, lambda: crear_degradado_vertical(canvas, 1100, 650, "#8B0000", "#FFFFFF"))
@@ -222,15 +288,17 @@ def Autorizacion_Pagos_Compras():
               foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
 
-
     # Treeview de autorizaciones
-    tree_aut = ttk.Treeview(frame_autorizaciones, columns=("ID", "Tipo", "Solicitante", "Monto", "Fecha Requerida", "Descripcion"), show="headings")
+    tree_aut = ttk.Treeview(frame_autorizaciones, columns=("ID", "Tipo", "Solicitante", "Monto", "Fecha Requerida", "Descripcion", "Observaciones"), show="headings")
     for col in tree_aut["columns"]:
-            tree_aut.heading(col, text=col)
-            if col == "Descripcion":
-                tree_aut.column(col, width=380, anchor="w")
-            else:
-                tree_aut.column(col, width=150, anchor="center")
+        tree_aut.heading(col, text=col)
+        if col == "Descripcion":
+            tree_aut.column(col, width=400, anchor="w")
+        elif col == "Observaciones":
+            tree_aut.column(col, width=400, anchor="w")
+        else:
+            tree_aut.column(col, width=120, anchor="center")
+
    
     tree_aut.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -238,10 +306,22 @@ def Autorizacion_Pagos_Compras():
     scrollbar_x2 = ttk.Scrollbar(frame_autorizaciones, orient="horizontal", command=tree_aut.xview)
     scrollbar_x2.pack(side="bottom", fill="x")
 
+    def on_autorizacion_select(event):
+        item = tree_aut.focus()
+        if not item:
+            return
+        valores = tree_aut.item(item, "values")
+        if valores:
+            id_autorizacion = valores[0]
+            mostrar_detalles_autorizacion(id_autorizacion)
+
+
     tree_aut.configure(xscrollcommand=scrollbar_x2.set)
+    tree_aut.bind("<Double-1>", on_autorizacion_select)
+
 
     # Treeview de solicitudes
-    tree_sol = ttk.Treeview(frame_solicitudes, columns=("ID", "Importe", "Fecha","Proyecto", "Concepto"), show="headings")
+    tree_sol = ttk.Treeview(frame_solicitudes, columns=("ID", "Importe", "Fecha", "Concepto", "Contrato"), show="headings")
     for col in tree_sol["columns"]:
         tree_sol.heading(col, text=col)
     tree_sol.pack(fill="both", expand=True, padx=10, pady=10)
@@ -264,8 +344,8 @@ def Autorizacion_Pagos_Compras():
         frame_solicitudes = tk.Frame(notebook, bg="white")
         notebook.add(frame_solicitudes, text="Solicitudes de Pago Autorizadas")
 
-        tree_solicitudes = ttk.Treeview(frame_solicitudes, columns=("ID", "Fecha", "Importe", "Proyecto/Contrato", "Concepto"), show="headings")
-        for col in ("ID", "Fecha", "Importe", "Proyecto/Contrato", "Concepto"):
+        tree_solicitudes = ttk.Treeview(frame_solicitudes, columns=("ID", "Fecha", "Importe", "Concepto"), show="headings")
+        for col in ("ID", "Fecha", "Importe", "Concepto"):
             tree_solicitudes.heading(col, text=col)
             tree_solicitudes.column(col, width=200, anchor="center")
         tree_solicitudes.pack(fill="both", expand=True, padx=10, pady=10)
@@ -292,7 +372,7 @@ def Autorizacion_Pagos_Compras():
         # Definir columnas
         for col in tree_aut_autorizadas["columns"]:
             tree_aut_autorizadas.heading(col, text=col)
-            if col == "Descripcion":
+            if col == "Descripcion" and col == "Observaciones":
                 tree_aut_autorizadas.column(col, width=380, anchor="w")
             else:
                 tree_aut_autorizadas.column(col, width=150, anchor="center")
@@ -315,7 +395,7 @@ def Autorizacion_Pagos_Compras():
         cursor = conexion.cursor()
         try:
             query = """
-                SELECT id_solicitud, fecha_solicitud, importe, proyecto_contrato, concepto
+                SELECT id_solicitud, fecha_solicitud, importe, concepto
                 FROM solicitudespago
                 WHERE estado = 'Autorizado'
             """
@@ -335,7 +415,7 @@ def Autorizacion_Pagos_Compras():
 
         consulta = """
             SELECT ac.id_autorizacion, ac.tipo_solicitud, ac.solicitante, ac.monto, ac.fecha_requerida, 
-                GROUP_CONCAT(aa.articulo SEPARATOR ', ')
+                GROUP_CONCAT(aa.articulo SEPARATOR ',')
             FROM autorizacionescompra ac
             LEFT JOIN articulosautorizacion aa ON ac.id_autorizacion = aa.id_autorizacion
             WHERE ac.estado = 'Autorizado'
@@ -360,7 +440,7 @@ def Autorizacion_Pagos_Compras():
         autorizar_solicitud_pago  
         autorizar_solicitud_pago(tree_sol)
 
-    tk.Button(canvas, text="Autorizar Autorización",  font=("Arial", 10, "bold"),
+    tk.Button(canvas, text="Autorizar Compras",  font=("Arial", 10, "bold"),
               command=autorizar_autorizacion).place(relx=0.35, rely=0.90, relwidth=0.15, relheight=0.06)
 
     tk.Button(canvas, text="Autorizar Solicitud", font=("Arial", 10, "bold"),
@@ -369,10 +449,6 @@ def Autorizacion_Pagos_Compras():
     tk.Button(canvas, text="Autorizados", command=ventana_autorizados, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.90, relwidth=0.15, relheight=0.06)
     
     tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.92, relwidth=0.08, relheight=0.04)
-
-    tk.Button(ventana, text="Enviar Archivos", command=lambda: enviar_documentos_a_contador(usuario_actual), bg="#0066CC", fg="white", font=("Arial", 10, "bold")
-              ).place(relx=0.20, rely=0.90, relwidth=0.11, relheight=0.06)
-
 
     # Cargar los registros en los TreeViews
     cargar_autorizaciones_pendientes(tree_aut)

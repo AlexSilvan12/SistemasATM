@@ -16,3 +16,8 @@ def conectar_bd():
         print(f"Error al conectar a la base de datos: {e}")
         return None
 
+#192.168.1.71
+#administrador
+#ATM_4dm1n_25?
+#localhost
+#root

@@ -149,7 +149,7 @@ def ventana_login():
                             font=("Arial", 14, "bold"), fg="black", bg="white")
 
     label_usuario = tk.Label(canvas, text="Usuario:", font=("Arial", 11, "bold"), bg="white")
-    entry_usuario = ttk.Entry(canvas, width=30)
+    entry_usuario = ttk.Entry(canvas, width=40)
 
     label_contraseña = tk.Label(canvas, text="Contraseña:", font=("Arial", 11, "bold"))
     entry_contraseña = ttk.Entry(canvas, show="*", width=30)

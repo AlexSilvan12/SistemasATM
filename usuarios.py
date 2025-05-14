@@ -110,10 +110,6 @@ def modificar_usuario(id_usuario, nombre, email, rol, puesto, nueva_password, pa
 
 #Funcion para agregar un usuario nuevo
 def agregar_usuario(nombre, email, password, rol, puesto, firma_original, tree):
-    if not (nombre and email and password and rol and puesto and firma_original):
-        messagebox.showwarning("Campos vacíos", "Por favor, llena todos los campos.")
-        return
-
     password_encrypted = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8') if password else None
 
     try:
@@ -258,32 +254,47 @@ def ventana_agregar_usuario(tree):
 
     tk.Label(ventana, text="Nombre:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.15)
     entry_nombre = ttk.Entry(ventana)
-    entry_nombre.place(relx=0.15, rely=0.15, relwidth=0.2)
+    entry_nombre.place(relx=0.15, rely=0.15, relwidth=0.35)
 
     tk.Label(ventana, text="Puesto:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.25)
     entry_puesto = ttk.Entry(ventana)
-    entry_puesto.place(relx=0.15, rely=0.25, relwidth=0.2)
+    entry_puesto.place(relx=0.15, rely=0.25, relwidth=0.35)
 
     tk.Label(ventana, text="Email:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.35)
     entry_email = ttk.Entry(ventana)
-    entry_email.place(relx=0.15, rely=0.335, relwidth=0.2)
+    entry_email.place(relx=0.15, rely=0.335, relwidth=0.35)
 
     tk.Label(ventana, text="Contraseña:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.45)
     entry_password = ttk.Entry(ventana)
-    entry_password.place(relx=0.20, rely=0.45, relwidth=0.2)
+    entry_password.place(relx=0.20, rely=0.45, relwidth=0.35)
 
     tk.Label(ventana, text="Rol:", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.55)
     combo_rol = ttk.Combobox(ventana, values=["Administrador", "Contador", "Comprador", "Gerente"])
-    combo_rol.place(relx=0.15, rely=0.55, relwidth=0.2)
+    combo_rol.place(relx=0.15, rely=0.55, relwidth=0.30)
 
     tk.Label(ventana, text="Firma (PNG):", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.65)
     entry_firma = ttk.Entry(ventana)
-    entry_firma.place(relx=0.20, rely=0.65, relwidth=0.2)
-    tk.Button(ventana, text="Seleccionar", command=lambda: seleccionar_firma(entry_firma), font=("Arial", 10,"bold")).place(relx=0.45, rely=0.65, relwidth=0.2)
+    entry_firma.place(relx=0.20, rely=0.65, relwidth=0.35)
+    tk.Button(ventana, text="Seleccionar", command=lambda: seleccionar_firma(entry_firma), font=("Arial", 10,"bold")).place(relx=0.58, rely=0.65, relwidth=0.2)
 
+    def guardar():
+        nombre = entry_nombre.get()
+        email = entry_email.get()
+        password = entry_password.get()
+        rol = combo_rol.get()
+        puesto = entry_puesto.get()
+        firma = entry_firma.get()
+
+        if not all([nombre, email, password, rol, puesto, firma]):
+            messagebox.showwarning("Campos incompletos", "Por favor, llena todos los campos antes de guardar.")
+            return
+
+        agregar_usuario(nombre, email, password, rol, puesto, firma, tree)
+        ventana.destroy()  
 
     # Botón Guardar
-    tk.Button(ventana, text="Guardar", command=lambda: agregar_usuario(entry_nombre.get(), entry_email.get(), entry_password.get(), combo_rol.get(), entry_puesto.get(), entry_firma.get(), tree), font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.85)
+    tk.Button(ventana, text="Guardar", command=guardar, font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.85)
+
     tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.85)
 
 def hex_a_rgb(hex_color):

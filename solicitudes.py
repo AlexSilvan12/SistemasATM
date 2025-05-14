@@ -1,12 +1,10 @@
 import tkinter as tk
+from gastos_contrato import costos_contrato
 from tkinter import messagebox, ttk, filedialog
 from PIL import Image, ImageTk
 from database import conectar_bd
 from utils import ruta_relativa, centrar_ventana, convertir_excel_a_pdf
 from login import usuario_actual
-from Correos import enviar_documentos_a_gerente
-from login import usuario_actual
-
 from openpyxl import load_workbook
 import mysql.connector
 import os
@@ -28,7 +26,7 @@ def cargar_solicitudes(tree):
             return
 
         cursor = conexion.cursor()
-        cursor.execute("SELECT id_solicitud, fecha_solicitud, importe, proyecto_contrato, concepto FROM SolicitudesPago")
+        cursor.execute("SELECT id_solicitud, fecha_solicitud, importe, fecha_limite_pago, estado FROM SolicitudesPago")
 
         for solicitud in cursor.fetchall():
             tree.insert("", "end", values=solicitud)
@@ -52,7 +50,7 @@ def cargar_autorizaciones(tree):
         conexion = conectar_bd()
         cursor = conexion.cursor()
         cursor.execute("""
-    SELECT id_autorizacion, fecha_solicitud, monto, proyecto_contrato
+    SELECT id_autorizacion, fecha_solicitud, monto, fecha_limite_pago 
     FROM autorizacionescompra
     WHERE id_autorizacion NOT IN (
         SELECT id_autorizacion FROM SolicitudesPago
@@ -95,7 +93,7 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 
         # Autorización
         cursor.execute("""
-            SELECT fecha_solicitud, monto, proyecto_contrato, instruccion, id_proveedor, fecha_limite_pago 
+            SELECT fecha_solicitud, monto, instruccion, id_proveedor, fecha_limite_pago, IVA, subtotal
             FROM autorizacionescompra 
             WHERE id_autorizacion = %s
         """, (id_autorizacion,))
@@ -104,7 +102,7 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
             messagebox.showerror("Error", "No se encontró la autorización.")
             return
 
-        fecha_solicitud, monto, proyecto_contrato, instruccion, id_proveedor, fechalimite = autorizacion
+        fecha_solicitud, monto, instruccion, id_proveedor, fechalimite, iva, subtotal = autorizacion
 
         # Proveedor
         cursor.execute("""
@@ -123,35 +121,46 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 
         # Insertar en la tabla SolicitudesPago
     try:
-            conexion = conectar_bd()
-            cursor = conexion.cursor()
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
 
-            # Verificar si ya existe el ID
-            cursor.execute("SELECT COUNT(*) FROM SolicitudesPago WHERE id_solicitud = %s", (id_solicitud,))
-            if cursor.fetchone()[0] > 0:
-                messagebox.showwarning("Advertencia", f"Ya existe una solicitud con el ID '{id_solicitud}'. No se guardó en la tabla.")
-            else:
-                query = """
-                    INSERT INTO SolicitudesPago (
-                    id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud, 
-                    importe, instruccion, referencia_pago, concepto, 
-                    fecha_recibido_revision, fecha_limite_pago, num_facturas, proyecto_contrato, estado
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente')
-            """
-                cursor.execute(query, (
-                id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud,
-                monto, instruccion, referencia_pago, concepto, fecha_solicitud, fechalimite, factura, proyecto_contrato
-            ))
-            conexion.commit()
-            messagebox.showinfo("✅ Éxito", f"Solicitud '{id_solicitud}' guardada en la base de datos.")
-            entry_consecutivo.delete(0, tk.END)
-            entry_referencia.delete(0, tk.END)
-            entry_concepto.delete(0, tk.END)
-            entry_factura.delete(0,tk.END)
+        # Verificar si ya existe el ID
+        cursor.execute("SELECT COUNT(*) FROM SolicitudesPago WHERE id_solicitud = %s", (id_solicitud,))
+        if cursor.fetchone()[0] > 0:
+            messagebox.showwarning("Advertencia", f"Ya existe una solicitud con el ID '{id_solicitud}'. No se guardó en la tabla.")
+        else:
+            query = """
+                INSERT INTO SolicitudesPago (
+                id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud, 
+                importe, instruccion, referencia_pago, concepto, 
+                fecha_recibido_revision, fecha_limite_pago, num_facturas, estado, IVA, subtotal
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s, %s)
+        """
+            cursor.execute(query, (
+            id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud,
+            monto, instruccion, referencia_pago, concepto, fecha_solicitud, fechalimite, factura, iva, subtotal
+        ))
+        conexion.commit()
+        messagebox.showinfo("✅ Éxito", f"Solicitud '{id_solicitud}' guardada en la base de datos.")
+        entry_consecutivo.delete(0, tk.END)
+        entry_referencia.delete(0, tk.END)
+        entry_concepto.delete(0, tk.END)
+        entry_factura.delete(0,tk.END)
 
                 # 🔄 Recargar el Treeview
-            cargar_autorizaciones(tree)
+        cargar_autorizaciones(tree)
+
+        # Guardar los contratos asociados en la tabla solicitud_contrato
+        cursor.execute("SELECT id_contrato, importe FROM Autorizacion_Contratos WHERE id_autorizacion = %s", (id_autorizacion,))
+        contratos = cursor.fetchall()
+
+        for id_contrato, importe in contratos:
+            cursor.execute("""
+                INSERT INTO solicitud_contratos (id_solicitud, id_contrato, importe)
+                VALUES (%s, %s, %s)
+            """, (id_solicitud, id_contrato, importe))
+        conexion.commit()
 
     except mysql.connector.Error as err:
             messagebox.showerror("Error", f"No se pudo registrar la solicitud en la base de datos:\n{err}")
@@ -160,15 +169,28 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
             if conexion: conexion.close()
 
     # Generar el archivo Excel
-    generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
-                  referencia_pago, fechalimite, concepto, factura, *proveedor, usuario_actual["nombre"])
+    generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
+                  referencia_pago, fechalimite, concepto, factura, *proveedor, usuario_actual["nombre"], iva, subtotal)
 
 
 # Función que llena la plantilla Excel con los datos
-def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instruccion,
-                  referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco, nombre_usuario):
+def generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
+                  referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco, nombre_usuario, iva, subtotal):
+
     
     try:
+        # Obtener los nombres de contratos asociados a la solicitud
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT c.contrato 
+            FROM solicitud_contratos sc
+            JOIN contratos c ON sc.id_contrato = c.id_contrato
+            WHERE sc.id_solicitud = %s
+        """, (id_solicitud,))
+        nombres_contratos = [fila[0] for fila in cursor.fetchall()]
+        texto_contratos = ", ".join(nombres_contratos)
+
         # Plantilla de solicitud de pago
         plantilla_path = ruta_relativa("Plantillas/Solicitud_Pago.xlsx")
         wb = load_workbook(plantilla_path)
@@ -194,8 +216,10 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, proyecto_contrato, instr
         # Llenar celdas con datos generales
         escribir(6, 10, id_solicitud, combinar="J6:L6")          # J6 - Consecutivo
         escribir(9, 3, fecha_solicitud, combinar="C9:E9")        # C9 - Fecha
-        escribir(9, 8, monto, combinar="H9:L9")                  # H9 - Monto
-        escribir(34, 8, proyecto_contrato, combinar="H34:L34")   # H33 - Proyecto
+        escribir(9, 10, iva, combinar="J9:K9")                   # H9 - Subtotal
+        escribir(9, 8, subtotal, combinar="H9:I9")              # J9 - IVA
+        escribir(9, 12, monto, combinar="L9:L9")                 # H9 - Monto
+        escribir(34, 8, texto_contratos, combinar="H34:L34")   # H34 - Proyecto
 
         escribir(12, 3, nombre, combinar="C12:L12")              # C12 - Nombre proveedor
         escribir(15, 7, rfc, combinar="G15:L15")                 # G15 - RFC
@@ -331,18 +355,17 @@ def gestionar_solicitudes():
         cursor = conexion.cursor()
         if termino:
             consulta = """
-                SELECT id_autorizacion, fecha_solicitud, monto, proyecto_contrato FROM autorizacionescompra
+                SELECT id_autorizacion, fecha_solicitud, monto FROM autorizacionescompra
                 WHERE LOWER(id_autorizacion) LIKE %s
                 OR LOWER(fecha_solicitud) LIKE %s
-                OR LOWER(monto) LIKE %s
-                OR LOWER(proyecto_contrato) LIKE %s       
+                OR LOWER(monto) LIKE %s       
             """
             like_termino = f"%{termino}%"
-            cursor.execute(consulta, (like_termino, like_termino, like_termino, like_termino))
+            cursor.execute(consulta, (like_termino, like_termino, like_termino))
 
         else : 
             consulta= ("""
-                SELECT id_autorizacion, fecha_solicitud, monto, proyecto_contrato
+                SELECT id_autorizacion, fecha_solicitud, monto
                 FROM autorizacionescompra
                 WHERE id_autorizacion NOT IN (
                     SELECT id_autorizacion FROM SolicitudesPago
@@ -389,8 +412,8 @@ def gestionar_solicitudes():
               foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
     # Treeview (tabla)
-    tree = ttk.Treeview(ventana, columns=("ID", "Fecha", "Monto", "Proyecto"), show="headings")
-    for col in ("ID", "Fecha", "Monto", "Proyecto"):
+    tree = ttk.Treeview(ventana, columns=("ID", "Fecha", "Monto", "Limite de Pago"), show="headings")
+    for col in ("ID", "Fecha", "Monto", "Limite de Pago"):
         tree.heading(col, text=col)
 
     # Scrollbar
@@ -413,12 +436,12 @@ def gestionar_solicitudes():
         style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
                 foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
-        # Frame con tamaño más controlado
+        
         frame_tabla = tk.Frame(ventana_solicitudes)
         frame_tabla.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.75)  # ⬅️ Ajusta tamaño aquí
 
-        tree_local = ttk.Treeview(frame_tabla, columns=("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"), show="headings")
-        for col in ("ID", "fecha", "Importe", "Proyecto/Contrato", "Concepto"):
+        tree_local = ttk.Treeview(frame_tabla, columns=("ID", "fecha", "Importe", "Limite de Pago", "Estado"), show="headings")
+        for col in ("ID", "fecha", "Importe", "Limite de Pago","Estado"):
             tree_local.heading(col, text=col)
 
         tree_local.place(relx=0, rely=0, relwidth=0.97, relheight=1)  # ⬅️ Ajusta si quieres más separación
@@ -433,13 +456,13 @@ def gestionar_solicitudes():
         cargar_solicitudes(tree_local)
 
     # Botones
-    tk.Button(ventana, text="Generar Excel",
+    tk.Button(ventana, text="Guardar y Generar Docs",
               command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura), font=("Arial", 10, "bold")
-             ).place(relx=0.40, rely=0.91, relwidth=0.097, relheight=0.05)
+             ).place(relx=0.40, rely=0.91, relwidth=0.12, relheight=0.05)
 
     tk.Button(ventana, text="Solicitudes Guardadas", command=Solicitudes, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.91, relwidth=0.15, relheight=0.05)
     tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.91, relwidth=0.095, relheight=0.05)
-    tk.Button(ventana, text="Enviar Archivos", command=lambda: enviar_documentos_a_gerente(usuario_actual), bg="#0066CC", fg="white", font=("Arial", 10, "bold")
+    tk.Button(ventana, text="Reporte de Gastos", command=lambda: costos_contrato(), font=("Arial", 10, "bold")
               ).place(relx=0.55, rely=0.91, relwidth=0.12, relheight=0.05)
 
 
