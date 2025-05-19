@@ -1,9 +1,11 @@
 
 import tkinter as tk
-from tkinter import ttk
+import os
+from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk
 from database import conectar_bd
-from openpyxl import workbook
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from utils import centrar_ventana, ruta_relativa
 
 def obtener_gastos_por_contrato(nombre_contrato=None, mes=None, año=None):
@@ -16,7 +18,11 @@ def obtener_gastos_por_contrato(nombre_contrato=None, mes=None, año=None):
             ac.tipo_solicitud,
             sc.importe,
             sp.fecha_solicitud,
-            sp.concepto
+            sp.concepto,
+            p.nombre AS proveedor,
+            sp.subtotal,
+            sp.IVA,
+            sp.importe as total           
         FROM 
             solicitudespago sp
         JOIN 
@@ -25,11 +31,12 @@ def obtener_gastos_por_contrato(nombre_contrato=None, mes=None, año=None):
             solicitud_contratos sc ON sp.id_solicitud = sc.id_solicitud
         JOIN 
             contratos c ON sc.id_contrato = c.id_contrato
+        JOIN
+            proveedores p ON sp.id_proveedor = p.id_proveedor
         WHERE 
             (%s IS NULL OR c.contrato = %s)
             AND (%s IS NULL OR MONTH(sp.fecha_solicitud) = %s)
             AND (%s IS NULL OR YEAR(sp.fecha_solicitud) = %s)
-            AND (sp.estado = 'Autorizado')
     """
     params = (nombre_contrato, nombre_contrato, mes, mes, año, año)
     cursor.execute(query, params)
@@ -59,9 +66,9 @@ def mostrar_gastos_por_contrato(tree, tree_total, id_contrato=None, mes=None, a�
         tree_total.delete(item)
 
     resumen = {}
-    totales_por_tipo = {"Maquinaria": 0, "Equipo y/o Htas": 0, "Servicios": 0, "Otros": 0}
+    totales_por_tipo = {"Maquinaria": 0, "Equipo y/o Htas": 0, "Servicios": 0, "Otros": 0, "Subtotal": 0, "IVA":0}
 
-    for id_solicitud, tipo, importe, fecha, concepto in datos:
+    for id_solicitud, tipo, importe, fecha, concepto, proveedor, subtotal, iva, total in datos:
         if id_solicitud not in resumen:
             resumen[id_solicitud] = {
                 "Maquinaria": 0,
@@ -69,7 +76,11 @@ def mostrar_gastos_por_contrato(tree, tree_total, id_contrato=None, mes=None, a�
                 "Servicios": 0,
                 "Otros": 0,
                 "Fecha": fecha,
-                "Concepto": concepto
+                "Concepto": concepto,
+                "Proveedor": proveedor,
+                "Subtotal": subtotal,
+                "IVA": iva,
+                "Total": total
             }
         resumen[id_solicitud][tipo] += importe
         totales_por_tipo[tipo] += importe
@@ -82,26 +93,154 @@ def mostrar_gastos_por_contrato(tree, tree_total, id_contrato=None, mes=None, a�
             valores["Servicios"],
             valores["Otros"],
             valores["Fecha"],
-            valores["Concepto"]
+            valores["Concepto"],
+            valores["Proveedor"],
+            valores["Subtotal"],
+            valores["IVA"],
+            valores["Total"]
         ))
 
     total_general = sum(totales_por_tipo.values())
 
+    total_subtotal = sum(res["Subtotal"] or 0 for res in resumen.values())
+    total_iva = sum(res["IVA"] or 0 for res in resumen.values())
+
+    total_general = (
+        totales_por_tipo["Maquinaria"] +
+        totales_por_tipo["Equipo y/o Htas"] +
+        totales_por_tipo["Servicios"] +
+        totales_por_tipo["Otros"]
+    )
+
     tree_total.insert("", "end", values=(
-        totales_por_tipo["Maquinaria"],
-        totales_por_tipo["Equipo y/o Htas"],
-        totales_por_tipo["Servicios"],
-        totales_por_tipo["Otros"],
-        total_general
+    totales_por_tipo["Maquinaria"],
+    totales_por_tipo["Equipo y/o Htas"],
+    totales_por_tipo["Servicios"],
+    totales_por_tipo["Otros"],
+    total_general
+    ))
+
+    # Insertar fila adicional con Subtotal e IVA
+    tree_total.insert("", "end", values=(
+    "", "", "", "SUBTOTAL", f"{total_subtotal:.2f}"
+    ))
+    tree_total.insert("", "end", values=(
+        "", "", "", "IVA", f"{total_iva:.2f}"
     ))
 
 
-def crear_excel():
-    wb = workbook()
-    sheet = wb.active 
+def exportar_reporte_excel(tree, tree_total, nombre_contrato="Todos los contratos"):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Reporte de Gastos"
 
-    data = []
+    # Estilos
+    encabezado_fill = PatternFill(start_color="8B0000", end_color="8B0000", fill_type="solid")
+    encabezado_font = Font(color="FFFFFF", bold=True)
+    celda_centrada = Alignment(horizontal="center", vertical="center")
+    borde = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
 
+    # Encabezados
+    encabezados = [
+       "Solicitud", "Maquinaria", "Equipo y/o Htas", "Servicios", "Otros",
+       "Fecha de Solicitud", "Concepto", "Proveedor", "Subtotal", "IVA", "Total"
+    ]
+    ws.append(encabezados)
+
+    # Aplicar estilo a los encabezados
+    for col_num, encabezado in enumerate(encabezados, start=1):
+        celda = ws.cell(row=1, column=col_num)
+        celda.fill = encabezado_fill
+        celda.font = encabezado_font
+        celda.alignment = celda_centrada
+        celda.border = borde
+
+    # Insertar datos del Treeview
+    for row_idx, item in enumerate(tree.get_children(), start=2):
+        valores = tree.item(item, "values")
+        if valores:
+            for col_idx, valor in enumerate(valores, start=1):
+                try:
+                    valor_float = float(valor)
+                    celda = ws.cell(row=row_idx, column=col_idx, value=valor_float)
+                    celda.number_format = '"$"#,##0.00'
+                except (ValueError, TypeError):
+                    celda = ws.cell(row=row_idx, column=col_idx, value=valor)
+                celda.alignment = celda_centrada
+                celda.border = borde
+
+    # Calcular totales
+    total_subtotal = 0
+    total_iva = 0
+    for row_id in tree.get_children():
+        row = tree.item(row_id)["values"]
+        try:
+            total_subtotal += float(row[8])  # Subtotal
+            total_iva += float(row[9])       # IVA
+        except (ValueError, TypeError):
+            continue
+
+    # Leer totales desde tree_total
+    for item in tree_total.get_children():
+        totales = tree_total.item(item, "values")
+        if totales and len(totales) >= 5:
+            try:
+                maquinaria = float(totales[0])
+                equipo = float(totales[1])
+                servicios = float(totales[2])
+                otros = float(totales[3])
+                total_general = float(totales[4])
+            except (ValueError, TypeError):
+                continue
+
+            # Fila de totales
+            fila_total = len(tree.get_children()) + 3
+            ws.append([])  # Fila vacía
+
+            ws.cell(row=fila_total, column=1, value=f"Totales para: {nombre_contrato}")
+            ws.cell(row=fila_total, column=1).font = Font(bold=True)
+
+            fila = [
+                nombre_contrato, maquinaria, equipo, servicios, otros,
+                "", "", "",
+                total_subtotal, total_iva, total_general
+            ]
+            for col_idx, valor in enumerate(fila, start=1):
+                celda = ws.cell(row=fila_total + 1, column=col_idx, value=valor)
+                celda.alignment = celda_centrada
+                celda.border = borde
+                if isinstance(valor, (int, float)):
+                    celda.number_format = '"$"#,##0.00'
+
+    # Ajustar ancho automático
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+        ws.column_dimensions[col_letter].width = max_length + 2
+
+    # Diálogo para guardar archivo
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".xlsx",
+        filetypes=[("Archivos de Excel", "*.xlsx")],
+        title="Guardar Reporte de Gastos"
+    )
+
+    if file_path:
+        try:
+            wb.save(file_path)
+            messagebox.showinfo("Éxito", f"Reporte guardado correctamente en:\n{file_path}")
+            os.startfile(file_path)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo guardar el archivo:\n{e}")
+    else:
+        messagebox.showwarning("Cancelado", "Guardado cancelado por el usuario.")
+        
 def hex_a_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
@@ -127,7 +266,7 @@ def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
 
 def costos_contrato():
     ventana = tk.Toplevel()
-    ventana.title("Gastos por Contrato")
+    ventana.title("Costos por Contrato")
     centrar_ventana(ventana, 1200, 600)
     
     canvas = tk.Canvas(ventana)
@@ -226,7 +365,11 @@ def costos_contrato():
 
     # Botón para aplicar el filtro
     tk.Button(canvas, text="Filtrar", font=("Arial", 10, "bold"), command=aplicar_filtro).place(relx=0.67, rely=0.22)
-
+    # Botón para exportar a Excel
+    tk.Button(ventana, text="Exportar a Excel", font=("Arial", 10, "bold"),
+          command=lambda: exportar_reporte_excel(tree, tree_total, combo_contratos.get())).place(relx=0.78, rely=0.90)
+    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
+    
     # Cargar contratos en el combobox
     cargar_contratos(combo_contratos)
     
@@ -242,19 +385,19 @@ def costos_contrato():
     tree_frame.place(relx=0.025, rely=0.30, relwidth=0.95, relheight=0.5)
 
     # Identificadores únicos para cada tabla
-    columnas_tree = ("Solicitud", "Maquinaria1", "Equipo1", "Servicios1", "Otros1", "Fecha1", "Concepto1")
+    columnas_tree = ("Solicitud1", "Maquinaria1", "Equipo1", "Servicios1", "Otros1", "Fecha1", "Concepto1")
     tree = ttk.Treeview(tree_frame, columns=columnas_tree, show="headings")
 
     # Encabezados visibles
-    encabezados_visibles = ("Solicitud", "Maquinaria", "Equipo y/o Htas", "Servicios", "Otros", "Fecha de Solicitud", "Concepto")
+    encabezados_visibles = ("Solicitud", "Maquinaria", "Equipo y/o Htas", "Servicios", "Otros", "Fecha de Solicitud", "Concepto", "Proveedor","Subtotal", "IVA")
     for ident, visible in zip(columnas_tree, encabezados_visibles):
         tree.heading(ident, text=visible)
-        if ident in ("Solicitud","Maquinaria1", "Equipo1", "Servicios1", "Otros1"):
-            tree.column(ident, width=70, anchor="center")
+        if ident in ("Solicitud1","Maquinaria1", "Equipo1", "Servicios1", "Otros1"):
+            tree.column(ident, width=60, anchor="center")
         elif ident == "Fecha1":
-            tree.column(ident, width=90, anchor="center")
+            tree.column(ident, width=80, anchor="center")
         else:
-            tree.column(ident, width=150, anchor="center")
+            tree.column(ident, width=305, anchor="w")
     tree.pack(fill="both", expand=True)
 
     # Encabezados específicos solo para el total
@@ -263,7 +406,7 @@ def costos_contrato():
     tree_total = ttk.Treeview(canvas, columns=columnas_total, show="headings", height=1)
     for col in columnas_total:
         tree_total.heading(col, text=col)
-        tree_total.column(col, anchor="center", width=100)
+        tree_total.column(col, anchor="center", width=125)
 
     tree_total.place(relx=0.05, rely=0.83)
 

@@ -164,6 +164,7 @@ def asignar_importes_a_contratos(ventana_padre, contratos_ids_nombres):
 
     def cancelar():
         ventana_importes.destroy()
+        return
 
     boton_frame = tk.Frame(ventana_importes)
     boton_frame.pack(pady=10)
@@ -421,10 +422,7 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         output_path = os.path.join(CARPETA_AUTORIZACIONES, f"Autorizacion_{consecutivo}.xlsx")
         workbook.save(output_path)
 
-        # 📄 Convertir a PDF
-        ruta_pdf = output_path.replace(".xlsx", ".pdf")
-        convertir_excel_a_pdf(output_path, ruta_pdf)
-        os.startfile(ruta_pdf)
+
 
         # 🧹 Limpiar y recargar
         limpiar_formulario(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, 
@@ -437,6 +435,10 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo generar el archivo Excel: {e}")
         return
+    
+        # 📄 Convertir a PDF
+    ruta_pdf = output_path.replace(".xlsx", ".pdf")
+    convertir_excel_a_pdf(output_path, ruta_pdf)
 
 
 #Interfaz de Usuario
@@ -603,13 +605,21 @@ def gestionar_autorizaciones():
 
     # Tabla de artículos
     tree = ttk.Treeview(ventana, columns=("Cantidad", "Unidad", "Descripción", "Observaciones"), show="headings")
+
     tree.heading("Cantidad", text="Cantidad")
     tree.heading("Unidad", text="Unidad")
     tree.heading("Descripción", text="Descripción")
     tree.heading("Observaciones", text="Observaciones")
+
+    # Ajustes de ancho y alineación por columna
+    tree.column("Cantidad", width=80, anchor="center")
+    tree.column("Unidad", width=80, anchor="center")
+    tree.column("Descripción", width=300, anchor="w")
+    tree.column("Observaciones", width=300, anchor="w")
+
     tree.place(relx=0.05, rely=0.70, relwidth=0.9, relheight=0.2)  # Tamaño relativo
 
-    #Ventana para vizualizar las autorizaciones cargadas
+    #Ventana para vizualizar las autorizaciones guardadas
     def autorizaciones(tree):
     
         ventana = tk.Toplevel()
@@ -625,6 +635,10 @@ def gestionar_autorizaciones():
         tree = ttk.Treeview(ventana, columns=("ID","Tipo", "Solicitante", "Monto", "Fecha Limite","Fecha solicitud"), show="headings")
         for col in ("ID","Tipo", "Solicitante", "Monto", "Fecha Limite","Fecha solicitud"):
             tree.heading(col, text=col)
+            if col == "Solicitante":
+                tree.column(col, width=100, anchor="w")
+            else:
+                tree.column(col, width=70, anchor= "center")
         tree.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.8)
         cargar_autorizaciones(tree)
         tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)

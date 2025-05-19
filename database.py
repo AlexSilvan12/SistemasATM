@@ -2,9 +2,9 @@ import mysql.connector
 
 def conectar_bd():
     config = {
-        'host':"localhost",
-        'user':"root",
-        'password':"",
+        'host':"192.168.1.71",
+        'user':"administrador",
+        'password':"ATM_4dm1n_25?",
         'database':"sistemasolicitudes",
         'raise_on_warnings': True
     }

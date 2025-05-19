@@ -1,6 +1,3 @@
-import sys
-
-
 from login import ventana_login
 
 if __name__ == "__main__":

@@ -1,7 +1,8 @@
 import tkinter as tk
 from gastos_contrato import costos_contrato
-from tkinter import messagebox, ttk, filedialog
+from tkinter import messagebox, ttk
 from PIL import Image, ImageTk
+from datetime import date
 from database import conectar_bd
 from utils import ruta_relativa, centrar_ventana, convertir_excel_a_pdf
 from login import usuario_actual
@@ -26,7 +27,7 @@ def cargar_solicitudes(tree):
             return
 
         cursor = conexion.cursor()
-        cursor.execute("SELECT id_solicitud, fecha_solicitud, importe, fecha_limite_pago, estado FROM SolicitudesPago")
+        cursor.execute("SELECT id_solicitud, fecha_solicitud, importe, fecha_limite_pago, estado FROM SolicitudesPago WHERE estado = 'Autorizado' OR estado = 'Pendiente'")
 
         for solicitud in cursor.fetchall():
             tree.insert("", "end", values=solicitud)
@@ -60,6 +61,52 @@ def cargar_autorizaciones(tree):
             tree.insert("", tk.END, values=row)
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo cargar autorizaciones: {e}")
+    finally:
+        if cursor: cursor.close()
+        if conexion: conexion.close()
+
+def marcar_como_pagado(tree, usuario_actual):
+    if usuario_actual["rol"] != "Contador":
+        messagebox.showwarning("Acceso denegado", "Solo los usuarios con rol Contador pueden realizar esta acción.")
+        return
+
+    seleccion = tree.focus()
+    if not seleccion:
+        messagebox.showwarning("Sin selección", "Selecciona una solicitud para marcar como pagada.")
+        return
+
+    valores = tree.item(seleccion, "values")
+    if not valores:
+        return
+
+    id_solicitud = valores[0]
+
+    try:
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+
+        cursor.execute("SELECT estado FROM solicitudespago WHERE id_solicitud = %s", (id_solicitud,))
+        estado_actual = cursor.fetchone()
+        if not estado_actual or estado_actual[0] != "Autorizado":
+            messagebox.showinfo("Información", "Solo se pueden marcar como pagadas las solicitudes con estado 'Autorizado'.")
+            return
+
+        hoy = date.today()
+
+        cursor.execute("""
+            UPDATE solicitudespago 
+            SET estado = 'Pagado', fecha_pago = %s 
+            WHERE id_solicitud = %s
+        """, (hoy, id_solicitud))
+
+        conexion.commit()
+        messagebox.showinfo("✅ Éxito", f"La solicitud {id_solicitud} fue marcada como 'Pagado' el {hoy}.")
+
+        # Opcional: refrescar el treeview si tienes una función como cargar_solicitudes_pendientes()
+        cargar_solicitudes(tree)
+
+    except Exception as e:
+        messagebox.showerror("❌ Error", f"No se pudo actualizar el estado:\n{e}")
     finally:
         if cursor: cursor.close()
         if conexion: conexion.close()
@@ -247,16 +294,12 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
         output_path = os.path.join(CARPETA_SOLICITUDES, f"Solicitud de Pago_{id_solicitud}.xlsx")
         wb.save(output_path)
 
-        # Convertir a PDF (la función se encarga de abrirlo)
-        ruta_pdf = output_path.replace(".xlsx", ".pdf")
-        convertir_excel_a_pdf(output_path, ruta_pdf)
-
-        os.startfile(ruta_pdf)
-
-
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo generar el Excel:\n{e}")
 
+     # Convertir a PDF (la función se encarga de abrirlo)
+    ruta_pdf = output_path.replace(".xlsx", ".pdf")
+    convertir_excel_a_pdf(output_path, ruta_pdf)
 
 # Interfaz gráfica
 def hex_a_rgb(hex_color):
@@ -415,6 +458,7 @@ def gestionar_solicitudes():
     tree = ttk.Treeview(ventana, columns=("ID", "Fecha", "Monto", "Limite de Pago"), show="headings")
     for col in ("ID", "Fecha", "Monto", "Limite de Pago"):
         tree.heading(col, text=col)
+        tree.column(col, anchor="center")
 
     # Scrollbar
     scrollbar = ttk.Scrollbar(ventana, orient="vertical", command=tree.yview)
@@ -440,9 +484,10 @@ def gestionar_solicitudes():
         frame_tabla = tk.Frame(ventana_solicitudes)
         frame_tabla.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.75)  # ⬅️ Ajusta tamaño aquí
 
-        tree_local = ttk.Treeview(frame_tabla, columns=("ID", "fecha", "Importe", "Limite de Pago", "Estado"), show="headings")
-        for col in ("ID", "fecha", "Importe", "Limite de Pago","Estado"):
+        tree_local = ttk.Treeview(frame_tabla, columns=("ID", "Fecha", "Importe", "Limite de Pago", "Estado"), show="headings")
+        for col in ("ID", "Fecha", "Importe", "Limite de Pago","Estado"):
             tree_local.heading(col, text=col)
+            tree_local.column(col, width=60, anchor="center")
 
         tree_local.place(relx=0, rely=0, relwidth=0.97, relheight=1)  # ⬅️ Ajusta si quieres más separación
 
@@ -450,20 +495,43 @@ def gestionar_solicitudes():
         tree_local.configure(yscrollcommand=scrollbar_local.set)
         scrollbar_local.place(relx=0.97, rely=0, relwidth=0.03, relheight=1)  # ⬅️ Posición vertical a la derecha
 
+        tk.Label(ventana_solicitudes, text="Buscar ID:", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.85)
+        entry_busqueda = ttk.Entry(ventana_solicitudes, width=20)
+        entry_busqueda.place(relx=0.2, rely=0.85)
+
+        def buscar_solicitud():
+            id_buscar = entry_busqueda.get().strip()
+            for item in tree_local.get_children():
+                tree_local.selection_remove(item)
+                valores = tree_local.item(item, "values")
+                if valores and str(valores[0]) == id_buscar:
+                    tree_local.see(item)
+                    tree_local.selection_add(item)
+                    break
+            else:
+                messagebox.showinfo("No encontrado", f"No se encontró la solicitud con ID {id_buscar}")
+
+        tk.Button(ventana_solicitudes, text="Buscar", command=buscar_solicitud,
+                  font=("Arial", 10, "bold"), bg="#004080", fg="white").place(relx=0.35, rely=0.845)
+
         tk.Button(ventana_solicitudes, text="Salir", command=ventana_solicitudes.destroy,
                 bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
+        
+        tk.Button(ventana_solicitudes, text="Marcar como Pagado", font=("Arial", 10, "bold"),
+          command=lambda: marcar_como_pagado(tree_local, usuario_actual),
+          bg="#006400", fg="white").place(relx=0.6, rely=0.92, relwidth=0.2, relheight=0.06)
 
         cargar_solicitudes(tree_local)
 
     # Botones
     tk.Button(ventana, text="Guardar y Generar Docs",
               command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura), font=("Arial", 10, "bold")
-             ).place(relx=0.40, rely=0.91, relwidth=0.12, relheight=0.05)
+             ).place(relx=0.35, rely=0.91, relwidth=0.18, relheight=0.05)
 
     tk.Button(ventana, text="Solicitudes Guardadas", command=Solicitudes, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.91, relwidth=0.15, relheight=0.05)
     tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.91, relwidth=0.095, relheight=0.05)
-    tk.Button(ventana, text="Reporte de Gastos", command=lambda: costos_contrato(), font=("Arial", 10, "bold")
-              ).place(relx=0.55, rely=0.91, relwidth=0.12, relheight=0.05)
+    tk.Button(ventana, text="Reporte de Costos", command=lambda: costos_contrato(), font=("Arial", 10, "bold")
+              ).place(relx=0.55, rely=0.91, relwidth=0.15, relheight=0.05)
 
 
 

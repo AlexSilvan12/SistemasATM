@@ -136,7 +136,7 @@ def autorizar_autorizacion_compra(tree):
             # 🚀 Abrir el PDF automáticamente
             os.startfile(ruta_pdf)
 
-        messagebox.showinfo("✅ Autorizado", f"La autorización {id_autorizacion} fue autorizada correctamente.")
+        messagebox.showinfo("✅ Autorizado", f"La Compra {id_autorizacion} fue autorizada correctamente.")
         cargar_autorizaciones_pendientes(tree)
 
     except Exception as e:
@@ -231,14 +231,17 @@ def mostrar_detalles_autorizacion(id_autorizacion):
         cursor.close()
         conexion.close()
 
+#Interfaz de Usuario
 def hex_a_rgb(hex_color):
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2 ,4))
 
 def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
     canvas.delete("degradado")
+
     rgb_inicio = hex_a_rgb(color_inicio)
     rgb_fin = hex_a_rgb(color_fin)
+
     pasos = alto // 2
     for i in range(pasos):
         y = alto - i - 1
@@ -246,27 +249,77 @@ def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
         g = int(rgb_inicio[1] + (rgb_fin[1] - rgb_inicio[1]) * i / pasos)
         b = int(rgb_inicio[2] + (rgb_fin[2] - rgb_inicio[2]) * i / pasos)
         color = f"#{r:02x}{g:02x}{b:02x}"
-        canvas.create_line(0, y, 1100, y, fill=color, tags="degradado")
-        canvas.create_rectangle(0, 0, 1100, alto // 2, fill=color_fin, outline="", tags="degradado")
-        
+        canvas.create_line(0, y, ancho, y, fill=color, tags="degradado")
+
+    canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
+
+
 def Autorizacion_Pagos_Compras():
     ventana = tk.Toplevel()
     ventana.title("Gestión de Solicitudes y Autorizaciones")
-    centrar_ventana(ventana, 1100, 650)
+    centrar_ventana(ventana, 1100, 600)
 
     canvas = tk.Canvas(ventana)
     canvas.pack(fill="both", expand=True)
 
-    canvas.bind("<Configure>", lambda event: crear_degradado_vertical(canvas, event.width, event.height, "#8B0000", "#FFFFFF"))
-    ventana.after(100, lambda: crear_degradado_vertical(canvas, 1100, 650, "#8B0000", "#FFFFFF"))
+    def actualizar_degradado(event):
+        # Obtener las dimensiones del canvas
+        ancho = canvas.winfo_width()
+        alto = canvas.winfo_height()
+        crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
 
-    label_titulo = tk.Label(canvas, text="ATM | Autorización de Pagos y Compras",
+    # Actualizar el fondo degradado al cambiar el tamaño de la ventana
+    canvas.bind("<Configure>", actualizar_degradado)
+
+    # Inicializar el degradado en el tamaño actual de la ventana
+    ventana.after(100, lambda: actualizar_degradado(None))
+
+    RUTA_LOGO = ruta_relativa("Plantillas/LogoATM.png")
+    RUTA_LOGO2 = ruta_relativa("Plantillas/ISO-9001.jpeg")
+    RUTA_LOGO3 = ruta_relativa("Plantillas/ISO-14001.jpeg")
+    RUTA_LOGO4 = ruta_relativa("Plantillas/ISO-45001.jpeg")
+    try:
+        # LOGO ATM
+        imagen = Image.open(RUTA_LOGO)
+        imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+        logo_img = ImageTk.PhotoImage(imagen)
+        label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
+        label_logo.image = logo_img
+        label_logo.place(relx=0.07, rely=0.01)
+
+        # ISO 9001
+        iso1 = Image.open(RUTA_LOGO2).resize((70, 70), Image.Resampling.LANCZOS)
+        iso1_img = ImageTk.PhotoImage(iso1)
+        label_iso1 = tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff")
+        label_iso1.image = iso1_img
+        label_iso1.place(relx=0.90, rely=0.015, anchor="ne")  # Esquina inferior derecha
+
+        # ISO 14001
+        iso2 = Image.open(RUTA_LOGO3).resize((70, 70), Image.Resampling.LANCZOS)
+        iso2_img = ImageTk.PhotoImage(iso2)
+        label_iso2 = tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff")
+        label_iso2.image = iso2_img
+        label_iso2.place(relx=0.95, rely=0.17, anchor="ne")  # Al lado izquierdo del ISO 9001
+
+        # ISO 45001
+        iso3 = Image.open(RUTA_LOGO4).resize((70, 70), Image.Resampling.LANCZOS)
+        iso3_img = ImageTk.PhotoImage(iso3)
+        label_iso3 = tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff")
+        label_iso3.image = iso3_img
+        label_iso3.place(relx=0.85, rely=0.17, anchor="ne")  # Al lado izquierdo del ISO 14001
+
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar el logotipo: {e}")
+        label_logo = tk.Label(canvas, text="LOGO", font=("Arial", 20, "bold"))
+
+
+    label_titulo = tk.Label(canvas, text="ATM | Autorización de Compras y Pagos",
                             font=("Arial", 20, "bold"), fg="black", bg="white")
     label_titulo.place(relx=0.27, rely=0.10)
 
     # Notebook con pestañas
     notebook = ttk.Notebook(canvas)
-    notebook.place(relx=0.05, rely=0.2, relwidth=0.9, relheight=0.6)
+    notebook.place(relx=0.05, rely=0.3, relwidth=0.9, relheight=0.6)
 
     frame_autorizaciones = tk.Frame(notebook)
     frame_solicitudes = tk.Frame(notebook)
@@ -296,8 +349,10 @@ def Autorizacion_Pagos_Compras():
             tree_aut.column(col, width=400, anchor="w")
         elif col == "Observaciones":
             tree_aut.column(col, width=400, anchor="w")
+        elif col == "Solicitante":
+            tree_aut.column(col, width=185, anchor="w")
         else:
-            tree_aut.column(col, width=120, anchor="center")
+            tree_aut.column(col, width=100, anchor="center")
 
    
     tree_aut.pack(fill="both", expand=True, padx=10, pady=10)
@@ -324,6 +379,11 @@ def Autorizacion_Pagos_Compras():
     tree_sol = ttk.Treeview(frame_solicitudes, columns=("ID", "Importe", "Fecha", "Concepto", "Contrato"), show="headings")
     for col in tree_sol["columns"]:
         tree_sol.heading(col, text=col)
+        if col == "Concepto" and col == "Contrato":
+            tree_sol.column(col, width=300, anchor="w")
+        else:
+            tree_sol.column(col, width=100, anchor="center")
+
     tree_sol.pack(fill="both", expand=True, padx=10, pady=10)
             # ✅ Scrollbar horizontal
     scrollbar_x2 = ttk.Scrollbar(frame_solicitudes, orient="horizontal", command=tree_sol.xview)
@@ -334,30 +394,65 @@ def Autorizacion_Pagos_Compras():
     def ventana_autorizados():
         ventana = tk.Toplevel()
         ventana.title("Autorizaciones y Solicitudes Autorizadas")
-        centrar_ventana(ventana, 1200, 600)
-        ventana.configure(bg="white")
+        centrar_ventana(ventana, 1100, 600)
+
+        canvas = tk.Canvas(ventana)
+        canvas.pack(fill="both", expand=True)
+
+        def actualizar_degradado(event):
+            # Obtener las dimensiones del canvas
+            ancho = canvas.winfo_width()
+            alto = canvas.winfo_height()
+            crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
+
+        # Actualizar el fondo degradado al cambiar el tamaño de la ventana
+        canvas.bind("<Configure>", actualizar_degradado)
+
+        # Inicializar el degradado en el tamaño actual de la ventana
+        ventana.after(100, lambda: actualizar_degradado(None))
+
+        try:
+            # LOGO ATM
+            imagen = Image.open(RUTA_LOGO)
+            imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+            logo_img = ImageTk.PhotoImage(imagen)
+            label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
+            label_logo.image = logo_img
+            label_logo.place(relx=0.07, rely=0.01)
+
+            # ISO 9001
+            iso1 = Image.open(RUTA_LOGO2).resize((70, 70), Image.Resampling.LANCZOS)
+            iso1_img = ImageTk.PhotoImage(iso1)
+            label_iso1 = tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff")
+            label_iso1.image = iso1_img
+            label_iso1.place(relx=0.90, rely=0.015, anchor="ne")  # Esquina inferior derecha
+
+            # ISO 14001
+            iso2 = Image.open(RUTA_LOGO3).resize((70, 70), Image.Resampling.LANCZOS)
+            iso2_img = ImageTk.PhotoImage(iso2)
+            label_iso2 = tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff")
+            label_iso2.image = iso2_img
+            label_iso2.place(relx=0.95, rely=0.17, anchor="ne")  # Al lado izquierdo del ISO 9001
+
+            # ISO 45001
+            iso3 = Image.open(RUTA_LOGO4).resize((70, 70), Image.Resampling.LANCZOS)
+            iso3_img = ImageTk.PhotoImage(iso3)
+            label_iso3 = tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff")
+            label_iso3.image = iso3_img
+            label_iso3.place(relx=0.85, rely=0.17, anchor="ne")  # Al lado izquierdo del ISO 14001
+
+        except Exception as e:
+            print(f"⚠️ No se pudo cargar el logotipo: {e}")
+            label_logo = tk.Label(canvas, text="LOGO", font=("Arial", 20, "bold"))
+
+        label_titulo = tk.Label(canvas, text="ATM | Compras y Pagos Autorizados",
+                            font=("Arial", 20, "bold"), fg="black", bg="white")
+        label_titulo.place(relx=0.27, rely=0.10)
+
 
         notebook = ttk.Notebook(ventana)
-        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        notebook.place(relx=0.05, rely=0.3, relwidth=0.9, relheight=0.6)
 
-        # --- Pestaña Solicitudes Autorizadas ---
-        frame_solicitudes = tk.Frame(notebook, bg="white")
-        notebook.add(frame_solicitudes, text="Solicitudes de Pago Autorizadas")
-
-        tree_solicitudes = ttk.Treeview(frame_solicitudes, columns=("ID", "Fecha", "Importe", "Concepto"), show="headings")
-        for col in ("ID", "Fecha", "Importe", "Concepto"):
-            tree_solicitudes.heading(col, text=col)
-            tree_solicitudes.column(col, width=200, anchor="center")
-        tree_solicitudes.pack(fill="both", expand=True, padx=10, pady=10)
-
-        # ✅ Scrollbar horizontal
-        scrollbar_x2 = ttk.Scrollbar(frame_solicitudes, orient="horizontal", command=tree_solicitudes.xview)
-        scrollbar_x2.pack(side="bottom", fill="x")
-
-        tree_solicitudes.configure(xscrollcommand=scrollbar_x2.set)
-      
-
-        cargar_solicitudes_autorizadas(tree_solicitudes)
 
         # --- Pestaña Autorizaciones Autorizadas ---
         frame_autorizadas = tk.Frame(ventana)
@@ -372,10 +467,12 @@ def Autorizacion_Pagos_Compras():
         # Definir columnas
         for col in tree_aut_autorizadas["columns"]:
             tree_aut_autorizadas.heading(col, text=col)
-            if col == "Descripcion" and col == "Observaciones":
-                tree_aut_autorizadas.column(col, width=380, anchor="w")
+            if col == "Descripcion":
+                tree_aut_autorizadas.column(col, width=400, anchor="w")
+            elif col == "Solicitante":
+                tree_aut_autorizadas.column(col,width=185 ,anchor="w")
             else:
-                tree_aut_autorizadas.column(col, width=150, anchor="center")
+                tree_aut_autorizadas.column(col, width=100, anchor="center")
 
         tree_aut_autorizadas.pack(side="top", fill="both", expand=True)
 
@@ -389,15 +486,39 @@ def Autorizacion_Pagos_Compras():
         cargar_autorizaciones_autorizadas(tree_aut_autorizadas)
 
 
+        # --- Pestaña Solicitudes Autorizadas ---
+        frame_solicitudes = tk.Frame(notebook, bg="white")
+        notebook.add(frame_solicitudes, text="Solicitudes de Pago Autorizadas")
+
+        tree_solicitudes = ttk.Treeview(frame_solicitudes, columns=("ID", "Fecha", "Importe", "Estado", "Concepto"), show="headings")
+        for col in ("ID", "Fecha", "Importe", "Estado","Concepto"):
+            tree_solicitudes.heading(col, text=col)
+            if col == "Concepto":
+                tree_solicitudes.column(col, width=400, anchor="w")
+            else:
+                tree_solicitudes.column(col, width=100, anchor="center")
+        tree_solicitudes.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # ✅ Scrollbar horizontal
+        scrollbar_x2 = ttk.Scrollbar(frame_solicitudes, orient="horizontal", command=tree_solicitudes.xview)
+        scrollbar_x2.pack(side="bottom", fill="x")
+
+        tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.92, relwidth=0.08, relheight=0.04)
+
+
+        tree_solicitudes.configure(xscrollcommand=scrollbar_x2.set)
+      
+        cargar_solicitudes_autorizadas(tree_solicitudes)
+
 # --- Funciones para cargar datos ---
     def cargar_solicitudes_autorizadas(tree):
         conexion = conectar_bd()
         cursor = conexion.cursor()
         try:
             query = """
-                SELECT id_solicitud, fecha_solicitud, importe, concepto
+                SELECT id_solicitud, fecha_solicitud, importe, estado, concepto
                 FROM solicitudespago
-                WHERE estado = 'Autorizado'
+                WHERE estado = 'Autorizado' OR estado = 'Pagado'
             """
             cursor.execute(query)
             resultados = cursor.fetchall()
@@ -441,12 +562,12 @@ def Autorizacion_Pagos_Compras():
         autorizar_solicitud_pago(tree_sol)
 
     tk.Button(canvas, text="Autorizar Compras",  font=("Arial", 10, "bold"),
-              command=autorizar_autorizacion).place(relx=0.35, rely=0.90, relwidth=0.15, relheight=0.06)
+              command=autorizar_autorizacion).place(relx=0.35, rely=0.91, relwidth=0.15, relheight=0.06)
 
     tk.Button(canvas, text="Autorizar Solicitud", font=("Arial", 10, "bold"),
-              command=autorizar_solicitud).place(relx=0.55, rely=0.90, relwidth=0.15, relheight=0.06)
+              command=autorizar_solicitud).place(relx=0.55, rely=0.91, relwidth=0.15, relheight=0.06)
     
-    tk.Button(canvas, text="Autorizados", command=ventana_autorizados, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.90, relwidth=0.15, relheight=0.06)
+    tk.Button(canvas, text="Autorizados", command=ventana_autorizados, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.91, relwidth=0.15, relheight=0.06)
     
     tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.92, relwidth=0.08, relheight=0.04)
 
