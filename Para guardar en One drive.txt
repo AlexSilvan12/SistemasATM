@@ -1,0 +1,265 @@
+CARPETA_AUTORIZACIONES = os.path.expanduser("~/OneDrive/Documentos/Autorizaciones")
+
+import os
+import shutil
+
+# Carpeta común en OneDrive sincronizada
+import os
+import shutil
+
+# Ruta de OneDrive local de cada usuario (dinámica)
+carpeta_onedrive = os.path.join(
+    os.environ['USERPROFILE'],
+    'OneDrive - ATI',
+    'Documentos de AppGestor'
+)
+
+# Guardar archivo en la carpeta compartida de OneDrive
+archivo_destino = os.path.join(carpeta_onedrive, 'cotizacion.pdf')
+shutil.copy('cotizacion.pdf', archivo_destino)
+
+def unir_pdfs(ruta_pdf1, ruta_pdf2, ruta_salida):
+    try:
+        merger = PdfWriter()
+        with open(ruta_pdf1, "rb") as f1, open(ruta_pdf2, "rb") as f2:
+            merger.append(PdfReader(f1))
+            merger.append(PdfReader(f2))
+        with open(ruta_salida, "wb") as salida:
+            merger.write(salida)
+        return True
+    except Exception as e:
+        print(f"❌ Error al unir PDFs: {e}")
+        return False
+
+
+def autorizar_autorizacion_y_solicitud(tree):
+    seleccion = tree.selection()
+    if not seleccion:
+        messagebox.showwarning("Selecciona una autorización", "Por favor selecciona una autorización para autorizar.")
+        return
+
+    id_autorizacion = tree.item(seleccion, "values")[0]
+
+    if not messagebox.askyesno("Confirmar", f"¿Deseas autorizar la compra y su solicitud relacionada ({id_autorizacion})?"):
+        return
+
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+
+    try:
+        # Obtener el ID de la solicitud relacionada con la autorización
+        cursor.execute("""
+            SELECT sp.id_solicitud 
+            FROM solicitudespago sp
+            JOIN autorizacionescompra ac ON ac.id_autorizacion = sp.id_autorizacion
+            WHERE ac.id_autorizacion = %s
+        """, (id_autorizacion,))
+        resultado = cursor.fetchone()
+
+        if not resultado:
+            raise Exception("No se encontró una solicitud relacionada con esta autorización.")
+
+        id_solicitud = resultado[0]
+
+        # Autorizar ambas en la base de datos
+        cursor.execute("UPDATE autorizacionescompra SET estado = 'Autorizado' WHERE id_autorizacion = %s", (id_autorizacion,))
+        cursor.execute("UPDATE solicitudespago SET estado = 'Autorizado' WHERE id_solicitud = %s", (id_solicitud,))
+        conexion.commit()
+
+        # Rutas de archivos
+        ruta_excel_aut = os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Autorizaciones de Compra', f'Autorizacion_ {id_autorizacion}.xlsx')
+        ruta_pdf_aut = ruta_excel_aut.replace(".xlsx", ".pdf")
+
+        ruta_excel_sol = os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Solicitudes de Pago', f'Solicitud_ {id_solicitud}.xlsx')
+        ruta_pdf_sol = ruta_excel_sol.replace(".xlsx", ".pdf")
+
+        ruta_firma = ruta_relativa(usuario_actual["firma"])
+        firma_img = ExcelImage(ruta_firma)
+        firma_img.width = 150
+        firma_img.height = 50
+
+        # Agregar firma a archivo de autorización
+        if os.path.exists(ruta_excel_aut):
+            wb_aut = load_workbook(ruta_excel_aut)
+            sheet_aut = wb_aut.active
+            sheet_aut.add_image(firma_img, "G37")
+            wb_aut.save(ruta_excel_aut)
+            convertir_excel_a_pdf(ruta_excel_aut, ruta_pdf_aut)
+
+        # Agregar firma a archivo de solicitud
+        if os.path.exists(ruta_excel_sol):
+            wb_sol = load_workbook(ruta_excel_sol)
+            sheet_sol = wb_sol.active
+            sheet_sol.add_image(firma_img, "I37")
+            wb_sol.save(ruta_excel_sol)
+            convertir_excel_a_pdf(ruta_excel_sol, ruta_pdf_sol)
+
+        messagebox.showinfo("✅ Autorizado", f"La autorización {id_autorizacion} y su solicitud {id_solicitud} fueron autorizadas correctamente.")
+        cargar_autorizaciones_pendientes(tree)
+
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo autorizar: {e}")
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+def ventana_autorizados():
+        ventana = tk.Toplevel()
+        ventana.title("Autorizaciones y Solicitudes Autorizadas")
+        centrar_ventana(ventana, 1100, 600)
+
+        canvas = tk.Canvas(ventana)
+        canvas.pack(fill="both", expand=True)
+
+        def actualizar_degradado(event):
+            # Obtener las dimensiones del canvas
+            ancho = canvas.winfo_width()
+            alto = canvas.winfo_height()
+            crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
+
+        # Actualizar el fondo degradado al cambiar el tamaño de la ventana
+        canvas.bind("<Configure>", actualizar_degradado)
+
+        # Inicializar el degradado en el tamaño actual de la ventana
+        ventana.after(100, lambda: actualizar_degradado(None))
+
+        try:
+            # LOGO ATM
+            imagen = Image.open(RUTA_LOGO)
+            imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+            logo_img = ImageTk.PhotoImage(imagen)
+            label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
+            label_logo.image = logo_img
+            label_logo.place(relx=0.07, rely=0.01)
+
+            # ISO 9001
+            iso1 = Image.open(RUTA_LOGO2).resize((70, 70), Image.Resampling.LANCZOS)
+            iso1_img = ImageTk.PhotoImage(iso1)
+            label_iso1 = tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff")
+            label_iso1.image = iso1_img
+            label_iso1.place(relx=0.90, rely=0.015, anchor="ne")  # Esquina inferior derecha
+
+            # ISO 14001
+            iso2 = Image.open(RUTA_LOGO3).resize((70, 70), Image.Resampling.LANCZOS)
+            iso2_img = ImageTk.PhotoImage(iso2)
+            label_iso2 = tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff")
+            label_iso2.image = iso2_img
+            label_iso2.place(relx=0.95, rely=0.17, anchor="ne")  # Al lado izquierdo del ISO 9001
+
+            # ISO 45001
+            iso3 = Image.open(RUTA_LOGO4).resize((70, 70), Image.Resampling.LANCZOS)
+            iso3_img = ImageTk.PhotoImage(iso3)
+            label_iso3 = tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff")
+            label_iso3.image = iso3_img
+            label_iso3.place(relx=0.85, rely=0.17, anchor="ne")  # Al lado izquierdo del ISO 14001
+
+        except Exception as e:
+            print(f"⚠️ No se pudo cargar el logotipo: {e}")
+            label_logo = tk.Label(canvas, text="LOGO", font=("Arial", 20, "bold"))
+
+        label_titulo = tk.Label(canvas, text="ATM | Compras y Pagos Autorizados",
+                            font=("Arial", 20, "bold"), fg="black", bg="white")
+        label_titulo.place(relx=0.27, rely=0.10)
+
+
+        notebook = ttk.Notebook(ventana)
+        notebook.place(relx=0.05, rely=0.3, relwidth=0.9, relheight=0.6)
+
+
+        # --- Pestaña Autorizaciones Autorizadas ---
+        frame_autorizadas = tk.Frame(ventana)
+        notebook.add(frame_autorizadas, text="Autorizaciones de Compra Autorizadas")
+
+        tree_aut_autorizadas = ttk.Treeview(
+            frame_autorizadas,
+            columns=("ID", "Tipo", "Solicitante", "Monto", "Fecha Requerida", "Descripcion"),
+            show="headings"
+        )
+
+        # Definir columnas
+        for col in tree_aut_autorizadas["columns"]:
+            tree_aut_autorizadas.heading(col, text=col)
+            if col == "Descripcion":
+                tree_aut_autorizadas.column(col, width=400, anchor="w")
+            elif col == "Solicitante":
+                tree_aut_autorizadas.column(col,width=185 ,anchor="w")
+            else:
+                tree_aut_autorizadas.column(col, width=100, anchor="center")
+
+        tree_aut_autorizadas.pack(side="top", fill="both", expand=True)
+
+        # ✅ Scrollbar horizontal
+        scrollbar_x2 = ttk.Scrollbar(frame_autorizadas, orient="horizontal", command=tree_aut_autorizadas.xview)
+        scrollbar_x2.pack(side="bottom", fill="x")
+
+        tree_aut_autorizadas.configure(xscrollcommand=scrollbar_x2.set)
+
+        # Cargar datos
+        cargar_autorizaciones_autorizadas(tree_aut_autorizadas)
+
+
+        # --- Pestaña Solicitudes Autorizadas ---
+        frame_solicitudes = tk.Frame(notebook, bg="white")
+        notebook.add(frame_solicitudes, text="Solicitudes de Pago Autorizadas")
+
+        tree_solicitudes = ttk.Treeview(frame_solicitudes, columns=("ID", "Fecha", "Importe", "Estado", "Concepto"), show="headings")
+        for col in ("ID", "Fecha", "Importe", "Estado","Concepto"):
+            tree_solicitudes.heading(col, text=col)
+            if col == "Concepto":
+                tree_solicitudes.column(col, width=400, anchor="w")
+            else:
+                tree_solicitudes.column(col, width=100, anchor="center")
+        tree_solicitudes.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # ✅ Scrollbar horizontal
+        scrollbar_x2 = ttk.Scrollbar(frame_solicitudes, orient="horizontal", command=tree_solicitudes.xview)
+        scrollbar_x2.pack(side="bottom", fill="x")
+
+        tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.92, relwidth=0.08, relheight=0.04)
+
+
+        tree_solicitudes.configure(xscrollcommand=scrollbar_x2.set)
+      
+        cargar_solicitudes_autorizadas(tree_solicitudes)
+
+# --- Funciones para cargar datos ---
+    def cargar_solicitudes_autorizadas(tree):
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        try:
+            query = """
+                SELECT id_solicitud, fecha_solicitud, importe, estado, concepto
+                FROM solicitudespago
+                WHERE estado = 'Autorizado' OR estado = 'Pagado'
+            """
+            cursor.execute(query)
+            resultados = cursor.fetchall()
+            for row in resultados:
+                tree.insert("", tk.END, values=row)
+        except Exception as e:
+            print(f"❌ Error al cargar solicitudes autorizadas: {e}")
+        finally:
+            cursor.close()
+            conexion.close()
+
+    def cargar_autorizaciones_autorizadas(tree):
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+
+        consulta = """
+            SELECT ac.id_autorizacion, ac.tipo_solicitud, ac.solicitante, ac.monto, ac.fecha_requerida, 
+                GROUP_CONCAT(aa.articulo SEPARATOR ',')
+            FROM autorizacionescompra ac
+            LEFT JOIN articulosautorizacion aa ON ac.id_autorizacion = aa.id_autorizacion
+            WHERE ac.estado = 'Autorizado'
+            GROUP BY ac.id_autorizacion
+        """
+
+        cursor.execute(consulta)
+        registros = cursor.fetchall()
+
+        for row in registros:
+            tree.insert("", "end", values=row)
+
+        conexion.close()

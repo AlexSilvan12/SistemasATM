@@ -1,0 +1,6 @@
+tkcalendar
+openpyxl
+Pillow
+pywin32
+bcrypt
+mysql-connector-python

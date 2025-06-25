@@ -1,15 +1,16 @@
+import shutil
 import tkinter as tk
 from tkinter import ttk, messagebox
+from tkinter import filedialog
 from tkcalendar import DateEntry
 from datetime import datetime
 import mysql.connector
 from proveedores import cargar_proveedores
-from utils import ruta_relativa, centrar_ventana, convertir_excel_a_pdf
+from utils import ruta_relativa, centrar_ventana, convertir_excel_a_pdf, salir
 from login import usuario_actual
 from database import conectar_bd
 from openpyxl import load_workbook
 from openpyxl.styles import Font
-from copy import copy
 import os
 from openpyxl.styles import Alignment
 from openpyxl.drawing.image import Image as ExcelImage
@@ -25,6 +26,38 @@ def agregar_autorizacion(entry_consecutivo, combo_tipo, combo_solicitante, entry
     solicitante = combo_solicitante.get()
     puesto = entry_puesto.get()
     area = entry_area.get()
+
+    def seleccionar_cotizacion(consecutivo):
+        # Selección del archivo original (cotización)
+        ruta_origen = filedialog.askopenfilename(
+            title="Seleccionar archivo de Cotización",
+            filetypes=[("PDF files", "*.pdf")]
+        )
+
+        if ruta_origen:
+                # Ruta base dentro de OneDrive
+                base_onedrive = os.path.join(
+                    os.environ['USERPROFILE'],
+                    'OneDrive - ATI',
+                    'Documentos de AppGestor'
+                )
+
+                # Carpeta destino para cotizaciones compartidas
+                CARPETA_COTIZACIONES = os.path.join(base_onedrive, 'Cotizaciones')
+
+                # Crear la carpeta si no existe
+                os.makedirs(CARPETA_COTIZACIONES, exist_ok=True)
+
+                # Nombre y ruta destino
+                nombre_destino = f"Cotizacion_Autoizacion de Compra_{consecutivo}.pdf"
+                ruta_destino = os.path.join(CARPETA_COTIZACIONES, nombre_destino)
+
+                # Copiar archivo
+                shutil.copy(ruta_origen, ruta_destino)
+
+                # Devolver ruta con slashes compatibles
+                return ruta_destino.replace("\\", "/")
+        return None
 
     # Convertir a objeto fecha y luego a string en formato correcto
     fecha_solicitud = datetime.strptime(entry_fecha_solicitud.get(), "%Y/%m/%d").strftime("%Y-%m-%d")
@@ -48,6 +81,28 @@ def agregar_autorizacion(entry_consecutivo, combo_tipo, combo_solicitante, entry
     if not seleccionados:
         messagebox.showwarning("Campos vacíos", "Selecciona al menos un contrato.")
         return    
+    
+    # ✅ Insertar los contratos relacionados
+    # Asociar contratos con importes definidos por el usuario
+    contratos_ids_nombres = [(listbox_contratos.get(i).split(" - ")[0], listbox_contratos.get(i)) for i in seleccionados]
+    importes_contratos = asignar_importes_a_contratos(tree.winfo_toplevel(), contratos_ids_nombres)
+
+    if importes_contratos is None:
+        messagebox.showinfo("Cancelado", "Registro de autorización cancelado por el usuario.")
+        return  # Detener el guardado
+    
+    # Validar que la suma coincida con el monto total ingresado
+    suma_importes = sum(importes_contratos.values())
+    try:
+        monto_float = float(monto)
+    except ValueError:
+        messagebox.showerror("Error", "El monto total ingresado no es válido.")
+        return
+
+    if round(suma_importes, 2) != round(monto_float, 2):
+        messagebox.showerror("Error", f"La suma de importes asignados a contratos ({suma_importes}) no coincide con el monto total ({monto_float})")
+        return
+
 
     conexion = None
     cursor = None
@@ -74,26 +129,17 @@ def agregar_autorizacion(entry_consecutivo, combo_tipo, combo_solicitante, entry
                   monto, id_proveedor, instruccion, limite, iva, subtotal)
         cursor.execute(query, valores)
 
-        # ✅ Insertar los contratos relacionados
-        # Asociar contratos con importes definidos por el usuario
-        contratos_ids_nombres = [(listbox_contratos.get(i).split(" - ")[0], listbox_contratos.get(i)) for i in seleccionados]
-        importes_contratos = asignar_importes_a_contratos(tree.winfo_toplevel(), contratos_ids_nombres)
+        ruta_cotizacion = seleccionar_cotizacion(consecutivo)
 
-        if importes_contratos is None:
-            messagebox.showinfo("Cancelado", "Registro de autorización cancelado por el usuario.")
-            return  # Detener el guardado
+        # Inserta/actualiza en la tabla AutorizacionesCompra
+        cursor.execute("""
+        UPDATE AutorizacionesCompra
+        SET ruta_cotizacion = %s
+        WHERE id_autorizacion = %s
+    """, (ruta_cotizacion, consecutivo))
 
-        # Validar que la suma coincida con el monto total ingresado
-        suma_importes = sum(importes_contratos.values())
-        try:
-            monto_float = float(monto)
-        except ValueError:
-            messagebox.showerror("Error", "El monto total ingresado no es válido.")
-            return
+        conexion.commit()
 
-        if round(suma_importes, 2) != round(monto_float, 2):
-            messagebox.showerror("Error", f"La suma de importes asignados a contratos ({suma_importes}) no coincide con el monto total ({monto_float})")
-            return
 
         # Insertar en tabla con importes asignados
         for id_contrato, importe in importes_contratos.items():
@@ -168,7 +214,6 @@ def asignar_importes_a_contratos(ventana_padre, contratos_ids_nombres):
 
     def cancelar():
         ventana_importes.destroy()
-        return
 
     boton_frame = tk.Frame(ventana_importes)
     boton_frame.pack(pady=10)
@@ -182,7 +227,6 @@ def asignar_importes_a_contratos(ventana_padre, contratos_ids_nombres):
         return importes
     else:
         return None 
-
 
 #Funcion para agregar los articulos comprados
 articulos_lista = []
@@ -206,7 +250,6 @@ def agregar_articulo(entry_cantidad, entry_unidad, entry_articulo, entry_observa
     entry_articulo.delete("1.0", "end")
     entry_observaciones.delete("1.0", "end")
         
-
 #Carga las autorizaciones y las muestra en la tabla
 def cargar_autorizaciones(tree):
 
@@ -226,7 +269,7 @@ def cargar_autorizaciones(tree):
         cursor = conexion.cursor()
 
         #Se ejecuta la consulta
-        query = "SELECT id_autorizacion, tipo_solicitud, solicitante, monto, fecha_limite_pago , fecha_solicitud FROM autorizacionescompra"
+        query = "SELECT id_autorizacion, tipo_solicitud, solicitante, monto, fecha_limite_pago , fecha_solicitud FROM autorizacionescompra WHERE estado = 'Pendiente'"
         cursor.execute(query)
         autorizaciones = cursor.fetchall()
 
@@ -243,7 +286,6 @@ def cargar_autorizaciones(tree):
             cursor.close()
         if conexion is not None:
             conexion.close()
-
 
 #Carga los articulos y los muestra en la tabla principal
 def cargar_articulos(tree):
@@ -282,7 +324,6 @@ def cargar_articulos(tree):
         if conexion is not None:
             conexion.close()
 
-
 def limpiar_formulario(entry_consecutivo, combo_tipo, entry_solicitante, entry_puesto, entry_area, entry_fecha_solicitud, 
                        entry_fecha_requerida, entry_monto, combo_proveedor,
                        combo_instruccion, entry_flimite, listbox_contratos, entry_IVA, entry_subtotal):
@@ -302,7 +343,6 @@ def limpiar_formulario(entry_consecutivo, combo_tipo, entry_solicitante, entry_p
     entry_IVA.delete(0, tk.END)
     entry_subtotal.delete(0, tk.END)
 
-
 #Funcion para limpiar la tabla de articulos
 def limpiar_tabla(tree):
     #Elimina todos los registros de la tabla de artículos en la interfaz
@@ -310,11 +350,10 @@ def limpiar_tabla(tree):
         tree.delete(row)
     articulos_lista.clear()
 
-
 #Funcion para generar el excel
 def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, 
                   entry_fecha_solicitud, entry_fecha_requerida, entry_monto, 
-                  combo_proveedor, combo_instruccion, articulos, tree, entry_flimite, listbox_contratos, entry_IVA, entry_subtotal):
+                  combo_proveedor, combo_instruccion, articulos, tree, entry_flimite, listbox_contratos, entry_IVA, entry_subtotal, ruta_cotizacion=None):
     try:
         plantilla_path = ruta_relativa("Plantillas/Autorizaciones.xlsx")
         workbook = load_workbook(plantilla_path)
@@ -341,11 +380,14 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         """, (consecutivo,))
         contratos = [row[0] for row in cursor.fetchall()]
         texto_contratos = " / ".join(contratos)
+
+        # Obtener ruta cotización
+        cursor.execute("SELECT ruta_cotizacion FROM AutorizacionesCompra WHERE id_autorizacion = %s", (consecutivo,))
+        resultado = cursor.fetchone()
+        ruta_cotizacion = resultado[0] if resultado else ""
         cursor.close()
         conexion.close()
         
-        desplazamiento = max(0, len(articulos) - 10)
-
         # ✅ Función para escribir y recombinar celdas
         def escribir_celda(fila, columna, valor, rango_combinado=None):
             if rango_combinado:
@@ -365,10 +407,18 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         escribir_celda(14, 2, area, "B14:D14")
         escribir_celda(12, 7, fecha_solicitud, "G12:H12")
         escribir_celda(13, 7, fecha_requerida, "G13:H13")
-        escribir_celda(14, 7, texto_contratos, "G14:H14")  # <- contratos aquí
-        escribir_celda(32, 2, monto, "B32:H32")
-        escribir_celda(31, 2, proveedor, "B31:H31")
+        escribir_celda(14, 7, texto_contratos, "G14:H14")  
+        escribir_celda(33, 2, monto, "B33:H33")
+        escribir_celda(32, 2, proveedor, "B32:H32")
         escribir_celda(30, 2, instruccion, "B30:H30")
+        # Concatenar instrucción con cotización y poner enlace
+        nombre_archivo = os.path.basename(ruta_cotizacion)
+        celda_cotizacion = sheet.cell(row=31, column=2)
+        celda_cotizacion.value = nombre_archivo
+        celda_cotizacion.hyperlink = ruta_cotizacion
+        celda_cotizacion.style = "Hyperlink"
+        celda_cotizacion.alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+        sheet.merge_cells("B31:H31")
 
         # 🧾 Artículos desde fila 17
         fila_inicio = 17
@@ -377,6 +427,8 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
             escribir_celda(fila_inicio + i, 3, unidad)        # C
             escribir_celda(fila_inicio + i, 4, articulo)      # D
             escribir_celda(fila_inicio + i, 7, observaciones) # G
+
+
 
         # Combinar columnas D:F para "artículo"
         col_inicio_art = get_column_letter(4)  # D
@@ -417,33 +469,33 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         firma_img = ExcelImage(ruta_firma)
         firma_img.width = 120
         firma_img.height = 50
-        fila_firma = 37 + desplazamiento
+        fila_firma = 37 
         sheet.add_image(firma_img, f"B{fila_firma}")
 
 
         # 📁 Guardar archivo Excel
-        CARPETA_AUTORIZACIONES = ruta_relativa("Autorizaciones")
+        #CARPETA_AUTORIZACIONES = ruta_relativa("Autorizaciones") #Quitar cuando se sincronicen en one drive
+        CARPETA_AUTORIZACIONES = os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Autorizaciones de Compra')
+        if not os.path.exists(CARPETA_AUTORIZACIONES):
+            os.makedirs(CARPETA_AUTORIZACIONES)
+
         output_path = os.path.join(CARPETA_AUTORIZACIONES, f"Autorizacion_{consecutivo}.xlsx")
         workbook.save(output_path)
 
-
-
         # 🧹 Limpiar y recargar
         limpiar_formulario(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto, entry_area, 
-                           entry_fecha_solicitud, entry_fecha_requerida, entry_monto, 
-                           combo_proveedor, combo_instruccion, entry_flimite, listbox_contratos, entry_IVA, entry_subtotal)
+                        entry_fecha_solicitud, entry_fecha_requerida, entry_monto, 
+                        combo_proveedor, combo_instruccion, entry_flimite, listbox_contratos, entry_IVA, entry_subtotal)
         cargar_autorizaciones(tree)
         articulos_lista.clear()
         limpiar_tabla(tree)
-        
+
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo generar el archivo Excel: {e}")
         return
-    
-        # 📄 Convertir a PDF
+    # 📄 Convertir a PDF
     ruta_pdf = output_path.replace(".xlsx", ".pdf")
     convertir_excel_a_pdf(output_path, ruta_pdf)
-
 
 #Interfaz de Usuario
 def hex_a_rgb(hex_color):
@@ -467,8 +519,7 @@ def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
 
     canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
 
-
-def gestionar_autorizaciones():
+def gestionar_autorizaciones(rol, volver_menu_callback):
 
     def filtrar_proveedores(event):
         texto = combo_proveedor.get().lower()  # Obtener el texto en minúsculas
@@ -477,7 +528,7 @@ def gestionar_autorizaciones():
         # Mover el cursor al final del texto para evitar que se resetee la posición
         combo_proveedor.icursor(tk.END)  
 
-    ventana = tk.Toplevel()
+    ventana = tk.Tk()
     ventana.title("Gestión de Autorizaciones de Compra")
     centrar_ventana(ventana, 1200, 600)
 
@@ -496,7 +547,6 @@ def gestionar_autorizaciones():
 
     # Inicializar el degradado en el tamaño actual de la ventana
     ventana.after(100, lambda: actualizar_degradado(None))
-
 
     # Función para calcular posiciones relativas
     def pos(x, y):
@@ -578,12 +628,13 @@ def gestionar_autorizaciones():
 
     tk.Label(ventana, text="Descripción:", font=("Arial", 10, "bold"), bg="white").place(**pos(0.55, 0.20))
     entry_articulo = tk.Text(ventana, wrap="word", font=("Arial", 11))
-    entry_articulo.place(relx=0.55, rely=0.23, relwidth=0.38, relheight=0.08)  # Más espacio vertical y horizontal
+    entry_articulo.place(relx=0.55, rely=0.23, relwidth=0.38, relheight=0.08)
 
     tk.Label(ventana, text="Observaciones:", font=("Arial", 10, "bold"), bg="white").place(**pos(0.55, 0.33))
     entry_observaciones = tk.Text(ventana, wrap="word", font=("Arial", 11))
     entry_observaciones.place(relx=0.55, rely=0.36, relwidth=0.38, relheight=0.08)
 
+    #Informacion de costos
     tk.Label(ventana, text="Subtotal: ", font=("Arial", 10, "bold"), bg="#ffebeb").place(**pos(0.55, 0.60))
     entry_subtotal = ttk.Entry(ventana)
     entry_subtotal.place(**pos(0.63, 0.60))
@@ -645,7 +696,7 @@ def gestionar_autorizaciones():
                 tree.column(col, width=70, anchor= "center")
         tree.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.8)
         cargar_autorizaciones(tree)
-        tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
+        tk.Button(ventana, text="Salir", command=ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
 
 
     
@@ -662,7 +713,7 @@ def gestionar_autorizaciones():
     
     tk.Button(ventana,text="Autorizaciones Guardadas", command=lambda: autorizaciones(tree), font=("Arial", 10, "bold")).place(relx=0.78, rely=0.91, relwidth=0.15, relheight=0.05)
 
-    tk.Button(ventana, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
+    tk.Button(ventana, text="Salir", command= lambda: salir(volver_menu_callback, ventana), bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
 
 
     ventana.mainloop()
