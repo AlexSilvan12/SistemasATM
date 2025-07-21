@@ -10,14 +10,13 @@ Este instalador contiene la última versión del sistema para la gestión de aut
 📦 Contenido del archivo ZIP:
 ──────────────────────────────────────────────────────────────
 - Instalador_AppGestor.exe
-- LEEME.txt (este archivo)
+- LEEME.txt
 
 ──────────────────────────────────────────────────────────────
 🛠 INSTRUCCIONES DE INSTALACIÓN:
 ──────────────────────────────────────────────────────────────
 1. Extraiga el contenido del archivo ZIP en cualquier carpeta de su equipo.
-2. Haga clic derecho sobre "Instalador_AppGestor.exe" y seleccione:
-      ➤ Ejecutar como administrador
+2. Haga doble clic sobre "Instalador_AppGestor.exe"
 3. Siga los pasos del asistente de instalación.
 4. Una vez finalizado, encontrará un acceso directo en el escritorio
    y también en el menú Inicio de Windows.

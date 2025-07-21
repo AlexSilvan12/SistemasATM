@@ -9,7 +9,6 @@ import bcrypt
 from tkinter import filedialog
 import shutil
 
-
 #funcion para cargar usuarios registrados que no son administradores
 def cargar_usuarios():
     conexion = None
@@ -331,7 +330,7 @@ def gestionar_usuarios(rol, volver_menu_callback):
     try:
         # LOGO ATM
         imagen = Image.open(RUTA_LOGO)
-        imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+        imagen = imagen.resize((120, 160), Image.Resampling.LANCZOS)
         logo_img = ImageTk.PhotoImage(imagen)
         label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
         label_logo.image = logo_img

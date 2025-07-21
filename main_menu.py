@@ -48,7 +48,7 @@ def abrir_menu(rol):
     widgets = {}
 
     try:
-        imagen = Image.open(LOGO_PATH).resize((150, 160), Image.Resampling.LANCZOS)
+        imagen = Image.open(LOGO_PATH).resize((120, 160), Image.Resampling.LANCZOS)
         logo_img = ImageTk.PhotoImage(imagen)
         label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
         label_logo.image = logo_img
@@ -107,7 +107,7 @@ def abrir_menu(rol):
             ("Gestión de Autorizaciones", gestionar_autorizaciones),
             ("Gestión de Solicitudes", gestionar_solicitudes),
             ("Gestión de Proveedores", gestionar_proveedores),
-            ("Autorizaciones de Compra y Solicitudes de Pago por Autorizar", Autorizacion_Pagos_Compras)
+            ("Autorizacion de Compras y Pagos", Autorizacion_Pagos_Compras)
         ]
 
     y_base = 240

@@ -9,7 +9,8 @@ os.environ['PATH'] = dll_path + os.pathsep + os.environ['PATH']
 
 def conectar_bd():
     config = {
-        'host':"192.168.1.77",
+        'host':"189.230.170.66",
+        'port':3306,
         'user':"administrador",
         'password':"ATM_4dm1n_25?",
         'database':"sistemasolicitudes",

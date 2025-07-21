@@ -71,13 +71,13 @@
    'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
    'Pagos\\venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth__tkinter.py',
    'PYSOURCE'),
-  ('pyi_rth_pythoncom',
-   'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
-   'Pagos\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks\\pyi_rth_pythoncom.py',
-   'PYSOURCE'),
   ('pyi_rth_pywintypes',
    'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
    'Pagos\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks\\pyi_rth_pywintypes.py',
+   'PYSOURCE'),
+  ('pyi_rth_pythoncom',
+   'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
+   'Pagos\\venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\rthooks\\pyi_rth_pythoncom.py',
    'PYSOURCE'),
   ('main',
    'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y Pagos\\main.py',
@@ -85,7 +85,7 @@
  [],
  False,
  False,
- 1750702376,
+ 1752777789,
  [('runw.exe',
    'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
    'Pagos\\venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',

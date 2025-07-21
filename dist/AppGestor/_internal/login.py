@@ -108,7 +108,7 @@ def ventana_login():
     }
 
     if all(os.path.exists(ruta) for ruta in rutas.values()):
-        logo_img = ImageTk.PhotoImage(Image.open(rutas["atm"]).resize((150, 160), Image.Resampling.LANCZOS))
+        logo_img = ImageTk.PhotoImage(Image.open(rutas["atm"]).resize((120, 160), Image.Resampling.LANCZOS))
         iso1_img = ImageTk.PhotoImage(Image.open(rutas["iso1"]).resize((70, 70), Image.Resampling.LANCZOS))
         iso2_img = ImageTk.PhotoImage(Image.open(rutas["iso2"]).resize((70, 70), Image.Resampling.LANCZOS))
         iso3_img = ImageTk.PhotoImage(Image.open(rutas["iso3"]).resize((70, 70), Image.Resampling.LANCZOS))
@@ -117,7 +117,7 @@ def ventana_login():
         label_logo.image = logo_img
         label_logo.place(relx=0.10, rely=0.01)
 
-        tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff").place(relx=0.90, rely=0.01, anchor="ne")
+        tk.Label(canvas, image=iso1_img, borderwidth=0, bg="#ffffff").place(relx=0.90, rely=0.03, anchor="ne")
         tk.Label(canvas, image=iso2_img, borderwidth=0, bg="#ffffff").place(relx=0.95, rely=0.15, anchor="ne")
         tk.Label(canvas, image=iso3_img, borderwidth=0, bg="#ffffff").place(relx=0.85, rely=0.15, anchor="ne")
     else:

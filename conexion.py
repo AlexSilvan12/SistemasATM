@@ -1,22 +1,13 @@
-import mysql.connector
+import requests
 
-try: 
-    
-    conn = mysql.connector.connect(
-        host="192.168.1.77",
-        user="administrador",
-        password="ATM_4dm1n_25?",
-        database="sistemasolicitudes"
-    )
+url ="https://github.com/AlexSilvan12/SistemasATM/blob/main/version.txt"
 
-    print("Conexión Exitosa")
-
-    conn.close()
-except mysql.connector.Error as err:
-    print(f"Error: {err}")
-
-#192.168.1.77
-#administrador
-#ATM_4dm1n_25?
-#localhost
-#root
+try:
+    response = requests.get(url)
+    if response.status_code == 200:
+        nueva_version = response.text.strip()
+        print("Versión disponible:", nueva_version)
+    else:
+        print("Error al obtener la versión:", response.status_code)
+except Exception as e:
+    print("Error de conexión:", e)

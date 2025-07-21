@@ -23,6 +23,7 @@ def cargar_proveedores():
         proveedores = [f"{row[0]} - {row[1]}" for row in cursor.fetchall()]
         
         return proveedores
+
     except mysql.connector.Error as e:
         print(f"❌Error al cargar proveedores: {e}")
 
@@ -65,7 +66,9 @@ def agregar_proveedor(entry_nombre, entry_rfc, entry_email, entry_clave, entry_c
 
         #Mensaje de exito al agregar y cargar el proveedor nuevo a la tabla
         messagebox.showinfo("✅Éxito", "Proveedor agregado correctamente.")
-        cargar_proveedores(tree)
+        if tree is not None:
+            cargar_proveedores(tree)
+            
         ventana.destroy()
 
     except mysql.connector.Error as e:
@@ -239,8 +242,8 @@ def ventana_agregar_proveedor(tree):
 
     # Botón Guardar
     tk.Button(ventana, text="Guardar", command=lambda: agregar_proveedor(
-            entry_nombre, entry_rfc, entry_email, entry_banco,
-            entry_clave, entry_cuenta, tree, ventana
+            entry_nombre, entry_rfc, entry_email, entry_clave,
+            entry_cuenta, entry_banco, tree, ventana
         ), font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.85 )
     tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.85)
 
@@ -286,7 +289,7 @@ def gestionar_proveedores(rol, volver_menu_callback):
     try:
         # LOGO ATM
         imagen = Image.open(RUTA_LOGO)
-        imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+        imagen = imagen.resize((120, 160), Image.Resampling.LANCZOS)
         logo_img = ImageTk.PhotoImage(imagen)
         label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
         label_logo.image = logo_img

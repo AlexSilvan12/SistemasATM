@@ -27,6 +27,8 @@ def cargar_autorizaciones_pendientes(tree):
             GROUP_CONCAT(aa.observaciones SEPARATOR ', ') AS observaciones
         FROM 
             autorizacionescompra ac
+        INNER JOIN 
+            solicitudespago sp ON ac.id_autorizacion = sp.id_autorizacion
         LEFT JOIN 
             articulosautorizacion aa ON ac.id_autorizacion = aa.id_autorizacion
         WHERE 
@@ -38,11 +40,11 @@ def cargar_autorizaciones_pendientes(tree):
         cursor.execute(consulta)
         autorizaciones = cursor.fetchall()
 
-        # Limpiar primero
+        # Limpiar el Treeview
         for item in tree.get_children():
             tree.delete(item)
 
-        # Insertar filas
+        # Insertar nuevas filas
         for aut in autorizaciones:
             tree.insert("", tk.END, values=aut)
 
@@ -51,6 +53,7 @@ def cargar_autorizaciones_pendientes(tree):
     finally:
         cursor.close()
         conexion.close()
+
 
 def cargar_solicitudes_pendientes(tree):
     tree.delete(*tree.get_children())
@@ -166,6 +169,7 @@ def autorizar_autorizacion_y_solicitud(tree):
     finally:
         cursor.close()
         conexion.close()
+
 def mostrar_detalles_autorizacion(id_autorizacion):
     conexion = conectar_bd()
     cursor = conexion.cursor()
@@ -201,6 +205,35 @@ def mostrar_detalles_autorizacion(id_autorizacion):
     finally:
         cursor.close()
         conexion.close()
+
+def Modificar(tree):
+    seleccion = tree.selection()
+    if not seleccion:
+        messagebox.showwarning("Selecciona una autorización", "Por favor selecciona una autorización de Compra para enviar a modificación.")
+        return
+
+    id_autorizacion = tree.item(seleccion, "values")[0]
+
+    if not messagebox.askyesno("Confirmar", f"¿Deseas enviar la autorizacion ({id_autorizacion}) y su Solicitud de Pago correspondiente a que sean modificados?"):
+        return
+
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+
+    try:
+        # Mandar a Modificar la autorizacion
+        cursor.execute("UPDATE autorizacionescompra SET estado = 'Modificar' WHERE id_autorizacion = %s", (id_autorizacion,))
+        cursor.execute("UPDATE solicitudespago SET estado = 'Modificar' WHERE id_autorizacion = %s", (id_autorizacion,))
+        conexion.commit()
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo enviar: {e}")
+        return
+
+    finally:
+        cursor.close()
+        conexion.close()
+
+    cargar_autorizaciones_pendientes(tree)
 
 #Interfaz de Usuario
 def hex_a_rgb(hex_color):
@@ -290,13 +323,21 @@ def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
 
     style = ttk.Style()
     style.theme_use("alt")
-    style.configure("Treeview.Heading", font=("Arial", 10, "bold"), foreground="white", background="#990000")
+    style.configure("tree_sol.Heading", font=("Arial", 10, "bold"), foreground="white", background="#990000")
+    style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
+              foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
     tree_aut = ttk.Treeview(frame_autorizaciones, columns=("ID", "Tipo", "Solicitante", "Monto", "Fecha Requerida", "Descripcion", "Observaciones"), show="headings")
     for col in tree_aut["columns"]:
         tree_aut.heading(col, text=col)
-        ancho = 400 if col in ("Descripcion", "Observaciones") else 185 if col == "Solicitante" else 100
-        tree_aut.column(col, width=ancho, anchor="w" if col in ("Descripcion", "Observaciones", "Solicitante") else "center")
+        if col == "Descripcion":
+            tree_aut.column(col, width=400, anchor="w")
+        elif col == "Observaciones":
+            tree_aut.column(col, width=400, anchor="w")
+        elif col == "Solicitante":
+            tree_aut.column(col, width=185, anchor="w")
+        else:
+            tree_aut.column(col, width=100, anchor="center")
     tree_aut.pack(fill="both", expand=True, padx=10, pady=10)
 
     scrollbar_x = ttk.Scrollbar(frame_autorizaciones, orient="horizontal", command=tree_aut.xview)
@@ -337,7 +378,7 @@ def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
         try:
             # LOGO ATM
             imagen = Image.open(RUTA_LOGO)
-            imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+            imagen = imagen.resize((120, 160), Image.Resampling.LANCZOS)
             logo_img = ImageTk.PhotoImage(imagen)
             label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
             label_logo.image = logo_img
@@ -476,10 +517,14 @@ def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
 
     # Botones
     tk.Button(canvas, text="Autorizar Compras y Pago", font=("Arial", 10, "bold"),
-              command=lambda: autorizar_autorizacion_y_solicitud(tree_aut)).place(relx=0.45, rely=0.91, relwidth=0.18, relheight=0.06)
+              command=lambda: autorizar_autorizacion_y_solicitud(tree_aut)).place(relx=0.35, rely=0.91, relwidth=0.18, relheight=0.06)
 
     tk.Button(canvas, text="Compras y Pagos Autorizados", font=("Arial", 10, "bold"),
-              command=ventana_autorizados).place(relx=0.65, rely=0.91, relwidth=0.19, relheight=0.06)
+              command=ventana_autorizados).place(relx=0.55, rely=0.91, relwidth=0.19, relheight=0.06)
+
+    #tk.Button(canvas, text="Enviar a Modificación", font=("Arial", 10, "bold"),
+              #command=lambda: Modificar(tree_aut)).place(relx=0.75, rely=0.91, relwidth=0.19, relheight=0.06)
+
 
     tk.Button(ventana, text="Salir", command=lambda: salir(volver_menu_callback, ventana),
               bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.92, relwidth=0.08, relheight=0.04)

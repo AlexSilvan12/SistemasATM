@@ -24,7 +24,7 @@ def obtener_gastos_por_contrato(nombre_contrato=None, mes=None, año=None):
             p.nombre AS proveedor,
             sp.subtotal,
             sp.IVA,
-            sp.importe as total           
+            sp.importe as total         
         FROM 
             solicitudespago sp
         JOIN 
@@ -189,24 +189,66 @@ def exportar_reporte_excel(tree, tree_total, nombre_contrato="Todos los contrato
             # Etiqueta de totales
             ws.cell(row=fila_total, column=1, value=f"Totales para: {nombre_contrato}").font = Font(bold=True)
 
-            # Celda "Total del contrato" con estilo en columna 6
-            celda_texto_total = ws.cell(row=fila_total, column=6, value="Total del contrato")
-            celda_texto_total.font = encabezado_font
-            celda_texto_total.fill = encabezado_fill
-            celda_texto_total.alignment = celda_centrada
-            celda_texto_total.border = borde
+        # Clasificación por moneda: MXN y USD
+    totales_por_moneda = {"MXN": [0, 0, 0, 0], "USD": [0, 0, 0, 0]}  # maquinaria, equipo, servicios, otros
 
-            # Fila de valores (solo 6 columnas)
-            fila = [
-                nombre_contrato, maquinaria, equipo, servicios, otros, total_general
-            ]
-            for col_idx, valor in enumerate(fila, start=1):
-                celda = ws.cell(row=fila_total + 1, column=col_idx, value=valor)
-                celda.alignment = celda_centrada
-                celda.border = borde
-                if isinstance(valor, (int, float)):
-                    celda.number_format = '"$"#,##0.00'
+    for item in tree.get_children():
+        valores = tree.item(item, "values")
+        if valores:
+            id_solicitud = valores[0]
+            try:
+                maquinaria = float(valores[1])
+                equipo = float(valores[2])
+                servicios = float(valores[3])
+                otros = float(valores[4])
 
+                # Obtener la moneda de la solicitud
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute("""
+                    SELECT ac.moneda
+                    FROM solicitudespago sp
+                    JOIN autorizacionescompra ac ON sp.id_autorizacion = ac.id_autorizacion
+                    WHERE sp.id_solicitud = %s
+                """, (id_solicitud,))
+                resultado = cursor.fetchone()
+                cursor.close()
+                conexion.close()
+
+                moneda = resultado[0] if resultado else "MXN"
+                if moneda in totales_por_moneda:
+                    totales_por_moneda[moneda][0] += maquinaria
+                    totales_por_moneda[moneda][1] += equipo
+                    totales_por_moneda[moneda][2] += servicios
+                    totales_por_moneda[moneda][3] += otros
+
+            except Exception as e:
+                continue
+
+    # Escribir resumen por moneda al final del Excel
+    for moneda, valores in totales_por_moneda.items():
+        total_general = sum(valores)
+        fila_total = ws.max_row + 2
+
+        # Título por moneda
+        ws.cell(row=fila_total, column=1, value=f"Totales en {moneda}").font = Font(bold=True)
+
+        # Encabezado "Total del contrato"
+        celda_encabezado = ws.cell(row=fila_total, column=6, value="Total del contrato")
+        celda_encabezado.font = encabezado_font
+        celda_encabezado.fill = encabezado_fill
+        celda_encabezado.alignment = celda_centrada
+        celda_encabezado.border = borde
+
+        # Fila de totales
+        fila = [f"Moneda: {moneda}", *valores, total_general]
+        for col_idx, valor in enumerate(fila, start=1):
+            celda = ws.cell(row=fila_total + 1, column=col_idx, value=valor)
+            celda.alignment = celda_centrada
+            celda.border = borde
+            if isinstance(valor, (int, float)):
+                celda.number_format = '"$"#,##0.00'
+    
     # Ajustar ancho automático de columnas (evitando MergedCell error)
     for i, col in enumerate(ws.iter_cols(min_row=1, max_col=ws.max_column), start=1):
         max_length = 0
@@ -254,7 +296,6 @@ def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
 
     canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
 
-
 def costos_contrato():
     ventana = tk.Toplevel()
     ventana.title("Costos por Contrato")
@@ -282,7 +323,7 @@ def costos_contrato():
     try:
         # LOGO ATM
         imagen = Image.open(RUTA_LOGO)
-        imagen = imagen.resize((150, 160), Image.Resampling.LANCZOS)
+        imagen = imagen.resize((120, 160), Image.Resampling.LANCZOS)
         logo_img = ImageTk.PhotoImage(imagen)
         label_logo = tk.Label(canvas, image=logo_img, borderwidth=0)
         label_logo.image = logo_img

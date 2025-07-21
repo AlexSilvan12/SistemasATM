@@ -18,7 +18,7 @@ a = Analysis(
     ('gerente.py', '.'),         # Incluye gerente
     ('gastos_contrato.py', '.'), # Incluye gastos_contrato
     ('main_menu.py', '.'),       # Incluye main_menu
-    ('login.py', '.'),		 #Incluye login
+    ('login.py', '.'),		 # Incluye login
     ('Plantillas/*.png', 'Plantillas'),
     ('Plantillas/*.jpeg', 'Plantillas'),
     ('Plantillas/*.ico', 'Plantillas'),
