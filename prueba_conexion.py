@@ -1,34 +1,35 @@
 import mysql.connector
 from mysql.connector import Error
 
-# CONFIGURA ESTOS DATOS
-IP_PUBLICA = "189.230.154.61"                                  
-PUERTO = 3306                      # O el puerto externo que abriste (ej. 5306)
-USUARIO = "administrador"          # Usuario MySQL con permisos remotos
+# Cambia estos valores si es necesario
+HOST = "alejandrosram.ddns-ip.net"  # ← tu subdominio DDNS
+PUERTO = 3306                       # o el puerto externo que abriste
+USUARIO = "administrador"
 CONTRASENA = "ATM_4dm1n_25?"
-BASE_DATOS = "sistemasolicitudes"
+BASEDATOS = "sistemasolicitudes"
 
 try:
     conexion = mysql.connector.connect(
-        host=IP_PUBLICA,
+        host=HOST,
         port=PUERTO,
         user=USUARIO,
         password=CONTRASENA,
-        database=BASE_DATOS,
-        auth_plugin='mysql_native_password'
+        database=BASEDATOS,
+        auth_plugin='mysql_native_password',
+        connect_timeout=5
     )
 
     if conexion.is_connected():
-        print("✅ Conexión exitosa a la base de datos.")
+        print("✅ Conexión exitosa a la base de datos usando el subdominio DDNS.")
         cursor = conexion.cursor()
         cursor.execute("SHOW TABLES;")
         tablas = cursor.fetchall()
-        print("📋 Tablas encontradas:", tablas)
+        print("📋 Tablas encontradas:", [t[0] for t in tablas])
         cursor.close()
         conexion.close()
     else:
         print("❌ No se pudo conectar a la base de datos.")
 
 except Error as e:
-    print(f"❌ Error de conexión: {e}")
+    print(f"❌ Error al conectar a MySQL: {e}")
 

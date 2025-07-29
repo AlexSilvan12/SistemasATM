@@ -85,7 +85,7 @@
  [],
  False,
  False,
- 1752777789,
+ 1753721810,
  [('runw.exe',
    'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
    'Pagos\\venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',

@@ -147,7 +147,7 @@ def exportar_reporte_excel(tree, tree_total, nombre_contrato="Todos los contrato
     # Encabezados
     encabezados = [
         "Solicitud", "Maquinaria", "Equipo y/o Htas", "Servicios", "Otros",
-        "Fecha de Solicitud", "Concepto", "Proveedor", "Subtotal", "IVA", "Total"
+        "Fecha de Solicitud", "Concepto", "Proveedor", "Subtotal", "IVA", "Total", "Estado"
     ]
     for col_num, encabezado in enumerate(encabezados, start=1):
         celda = ws.cell(row=fila_actual, column=col_num)
@@ -161,6 +161,9 @@ def exportar_reporte_excel(tree, tree_total, nombre_contrato="Todos los contrato
     for row_idx, item in enumerate(tree.get_children(), start=fila_actual + 1):
         valores = tree.item(item, "values")
         if valores:
+            id_solicitud = valores[0]
+
+            # Insertar los valores originales
             for col_idx, valor in enumerate(valores, start=1):
                 try:
                     valor_float = float(valor)
@@ -170,6 +173,27 @@ def exportar_reporte_excel(tree, tree_total, nombre_contrato="Todos los contrato
                     celda = ws.cell(row=row_idx, column=col_idx, value=valor)
                 celda.alignment = celda_centrada
                 celda.border = borde
+
+            # Consultar el estado desde la base de datos
+            try:
+                conexion = conectar_bd()
+                cursor = conexion.cursor()
+                cursor.execute("""
+                    SELECT estado
+                    FROM solicitudespago
+                    WHERE id_solicitud = %s
+                """, (id_solicitud,))
+                resultado = cursor.fetchone()
+                estado = resultado[0] if resultado else "Desconocido"
+                cursor.close()
+                conexion.close()
+            except Exception as e:
+                estado = "Error"
+
+            # Insertar el estado en la última columna
+            celda_estado = ws.cell(row=row_idx, column=len(encabezados), value=estado)
+            celda_estado.alignment = celda_centrada
+            celda_estado.border = borde
 
     # Leer totales desde tree_total
     for item in tree_total.get_children():

@@ -372,7 +372,7 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
 
         # Guardar Excel
         #CARPETA_SOLICITUDES = ruta_relativa("Solicitudes") #Quitar cuando se sincronicen en one drive
-        CARPETA_SOLICITUDES= os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Solicitudes de Pago')
+        CARPETA_SOLICITUDES= os.path.join(os.environ['USERPROFILE'], 'App Gestor - ATI', 'Documentos de AppGestor', 'Solicitudes de Pago')
         #Crear la carpeta si no existe
         if not os.path.exists(CARPETA_SOLICITUDES):
             os.makedirs(CARPETA_SOLICITUDES)

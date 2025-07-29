@@ -9,7 +9,7 @@ os.environ['PATH'] = dll_path + os.pathsep + os.environ['PATH']
 
 def conectar_bd():
     config = {
-        'host':"189.230.170.66",
+        'host':"andrewstechapps.ddns-ip.net",
         'port':3306,
         'user':"administrador",
         'password':"ATM_4dm1n_25?",
@@ -24,9 +24,3 @@ def conectar_bd():
     except mysql.connector.Error as e:
         print(f"Error al conectar a la base de datos: {e}")
         return None
-
-#192.168.1.77
-#administrador
-#ATM_4dm1n_25?
-#localhost
-#root

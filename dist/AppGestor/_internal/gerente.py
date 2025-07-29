@@ -22,6 +22,7 @@ def cargar_autorizaciones_pendientes(tree):
             ac.tipo_solicitud, 
             ac.solicitante, 
             ac.monto, 
+            ac.moneda,
             ac.fecha_requerida,
             GROUP_CONCAT(aa.articulo SEPARATOR ', ') AS descripcion,
             GROUP_CONCAT(aa.observaciones SEPARATOR ', ') AS observaciones
@@ -34,7 +35,7 @@ def cargar_autorizaciones_pendientes(tree):
         WHERE 
             ac.estado = 'Pendiente'
         GROUP BY 
-            ac.id_autorizacion, ac.tipo_solicitud, ac.solicitante, ac.monto, ac.fecha_requerida
+            ac.id_autorizacion, ac.tipo_solicitud, ac.solicitante, ac.monto, ac.moneda, ac.fecha_requerida
         """
 
         cursor.execute(consulta)
@@ -53,7 +54,6 @@ def cargar_autorizaciones_pendientes(tree):
     finally:
         cursor.close()
         conexion.close()
-
 
 def cargar_solicitudes_pendientes(tree):
     tree.delete(*tree.get_children())
@@ -95,6 +95,29 @@ def cargar_solicitudes_pendientes(tree):
     finally:
         cursor.close()
         conexion.close()
+
+def obtener_total_autorizado(moneda):
+    try:
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+
+        cursor.execute("""
+            SELECT SUM(importe)
+            FROM solicitudespago
+            WHERE estado = 'Autorizado' AND moneda = %s
+        """, (moneda,))
+        resultado = cursor.fetchone()
+        total = resultado[0] if resultado[0] is not None else 0.0
+
+        return total
+
+    except mysql.connector.Error as e:
+        messagebox.showerror("Error", f"Error al obtener total autorizado ({moneda}): {e}")
+        return None
+
+    finally:
+        if cursor: cursor.close()
+        if conexion: conexion.close()
 
 # Funcion para autorizar las autorizaciones de compras
 def autorizar_autorizacion_y_solicitud(tree):
@@ -257,7 +280,6 @@ def crear_degradado_vertical(canvas, ancho, alto, color_inicio, color_fin):
 
     canvas.create_rectangle(0, 0, ancho, alto // 2, fill=color_fin, outline="", tags="degradado")
 
-
 def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
     ventana = tk.Tk()
     ventana.title("Gestión de Solicitudes y Autorizaciones")
@@ -325,9 +347,15 @@ def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
     style.theme_use("alt")
     style.configure("tree_sol.Heading", font=("Arial", 10, "bold"), foreground="white", background="#990000")
     style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
-              foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
+            foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
-    tree_aut = ttk.Treeview(frame_autorizaciones, columns=("ID", "Tipo", "Solicitante", "Monto", "Fecha Requerida", "Descripcion", "Observaciones"), show="headings")
+    # ✅ Agregar columna "Moneda"
+    tree_aut = ttk.Treeview(
+        frame_autorizaciones,
+        columns=("ID", "Tipo", "Solicitante", "Monto", "Moneda", "Fecha Requerida", "Descripcion", "Observaciones"),
+        show="headings"
+    )
+
     for col in tree_aut["columns"]:
         tree_aut.heading(col, text=col)
         if col == "Descripcion":
@@ -336,8 +364,11 @@ def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
             tree_aut.column(col, width=400, anchor="w")
         elif col == "Solicitante":
             tree_aut.column(col, width=185, anchor="w")
+        elif col == "Moneda":
+            tree_aut.column(col, width=80, anchor="center")  # 👈 Ancho más pequeño para Moneda
         else:
             tree_aut.column(col, width=100, anchor="center")
+
     tree_aut.pack(fill="both", expand=True, padx=10, pady=10)
 
     scrollbar_x = ttk.Scrollbar(frame_autorizaciones, orient="horizontal", command=tree_aut.xview)
@@ -351,6 +382,15 @@ def Autorizacion_Pagos_Compras(rol, volver_menu_callback):
             mostrar_detalles_autorizacion(id_autorizacion)
 
     tree_aut.bind("<Double-1>", on_autorizacion_select)
+
+    total_mxn = obtener_total_autorizado("MXN")
+    total_usd = obtener_total_autorizado("USD")
+
+    etiqueta_mxn = tk.Label(canvas, text=f"Total autorizado (MXN): ${total_mxn:,.2f}", bg="#880101", fg="white", font=("Arial", 10))
+    etiqueta_mxn.place(relx=0.75, rely=0.90)
+
+    etiqueta_usd = tk.Label(canvas, text=f"Total autorizado (USD): ${total_usd:,.2f}", bg="#880101", fg="white", font=("Arial", 10))
+    etiqueta_usd.place(relx=0.75, rely=0.95)
 
     def ventana_autorizados():
         ventana = tk.Toplevel()

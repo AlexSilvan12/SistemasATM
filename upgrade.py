@@ -7,9 +7,8 @@ import os
 from utils import ruta_relativa
 
 VERSION_LOCAL = ruta_relativa("version_local.txt")
-URL_VERSION = "https://andrewstech-my.sharepoint.com/personal/app_gestor_andrewstech_net/_layouts/15/download.aspx?SourceUrl=%2Fpersonal%2Fapp%5Fgestor%5Fandrewstech%5Fnet%2FDocuments%2Fversion%2Etxt"
-URL_ZIP = "https://andrewstech-my.sharepoint.com/personal/app_gestor_andrewstech_net/_layouts/15/download.aspx?SourceUrl=%2Fpersonal%2Fapp%5Fgestor%5Fandrewstech%5Fnet%2FDocuments%2FActualizacion%2Ezip"
-
+URL_VERSION = "https://raw.githubusercontent.com/AlexSilvan12/SistemasATM/desarrollo/Actualizacion/version.txt"
+URL_ZIP = "https://github.com/AlexSilvan12/SistemasATM/releases/download/v1.0.2/Actualizacion_v1.0.2.zip"
 def obtener_version_local():
     try:
         with open(VERSION_LOCAL, "r", encoding="utf-8") as f:
@@ -53,7 +52,7 @@ def descargar_y_aplicar(nueva_version):
 
         shutil.rmtree("update_temp")
 
-        # ✅ Actualizar el archivo de versión local
+        # ✅ Actualiza el archivo de versión local
         with open(VERSION_LOCAL, "w", encoding="utf-8") as f:
             f.write(nueva_version)
 

@@ -1,6 +1,6 @@
 [Setup]
 AppName=AppGestor
-AppVersion=1.0.3
+AppVersion=1.1.0
 DefaultDirName={pf}\AppGestor
 DefaultGroupName=AppGestor
 OutputBaseFilename=Instalador_AppGestor

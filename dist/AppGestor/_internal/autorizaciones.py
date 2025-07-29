@@ -186,7 +186,7 @@ def asignar_importes_a_contratos(ventana_padre, contratos_ids_nombres, monto_tot
     ventana_importes = tk.Toplevel(ventana_padre)
     ventana_importes.title("Asignar porcentajes a contratos")
     centrar_ventana(ventana_importes, 450, 350)
-    tk.Label(ventana_importes, text="Asigne el porcentaje a cada contrato (suma debe ser 100%)", font=("Arial", 12, "bold")).pack(pady=10)
+    tk.Label(ventana_importes, text="Asigne el porcentaje de pago correspondiente para cada contrato", font=("Arial", 10, "bold")).pack(pady=10)
 
     entries = {}
 
@@ -1216,6 +1216,17 @@ def gestionar_autorizaciones(rol, volver_menu_callback):
         ventana = tk.Toplevel()
         ventana.title("Autorizaciones Guardadas")
         centrar_ventana(ventana, 1300, 600)
+
+        canvas = tk.Canvas(ventana)
+        canvas.pack(fill="both", expand=True)
+
+        def actualizar_degradado(event):
+            # Obtener las dimensiones del canvas
+            ancho = canvas.winfo_width()
+            alto = canvas.winfo_height()
+            crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
+
+        ventana.after(100, lambda: actualizar_degradado(None))
 
         style = ttk.Style()
         style.theme_use("alt")

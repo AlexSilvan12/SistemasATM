@@ -66,8 +66,12 @@ def cargar_usuarios_tree(tree):
     conexion.close()
 
 #Funcion para seleccionar firma desde los archivos
-def seleccionar_firma(entry_firma):
-    archivo = filedialog.askopenfilename(filetypes=[("Imágenes PNG", "*.png"), ("Todos los archivos", "*.*")])
+def seleccionar_firma(entry_firma, ventana_padre):
+    archivo = filedialog.askopenfilename(
+        parent=ventana_padre,
+        title="Seleccionar firma",
+        filetypes=[("Imágenes PNG o JPG", "*.png *.jpg *.jpeg"), ("Todos los archivos", "*.*")]
+    )    
     if archivo:
         entry_firma.delete(0, tk.END)
         entry_firma.insert(0, archivo)
@@ -174,16 +178,30 @@ def eliminar_usuario(tree):
         conexion = conectar_bd()
         cursor = conexion.cursor()
 
-        query = "DELETE FROM usuarios WHERE id_usuario = %s"
-        cursor.execute(query, (id_usuario,))
+        # ✅ Obtener ruta de firma
+        cursor.execute("SELECT ruta_firma FROM usuarios WHERE id_usuario = %s", (id_usuario,))
+        resultado = cursor.fetchone()
+
+        if resultado and resultado[0]:
+            ruta_firma_relativa = resultado[0]
+            ruta_firma_absoluta = ruta_relativa(ruta_firma_relativa)
+
+            # ✅ Eliminar archivo físico si existe
+            if os.path.exists(ruta_firma_absoluta):
+                os.remove(ruta_firma_absoluta)
+
+        # ✅ Eliminar usuario de la base de datos
+        cursor.execute("DELETE FROM usuarios WHERE id_usuario = %s", (id_usuario,))
         conexion.commit()
 
         messagebox.showinfo("✅ Éxito", "Usuario eliminado correctamente.")
         cargar_usuarios_tree(tree)
+
     except mysql.connector.Error as e:
         if conexion:
             conexion.rollback()
         messagebox.showerror("❌ Error", f"No se pudo eliminar al Usuario: {e}")
+
     finally:
         if cursor:
             cursor.close()
@@ -271,7 +289,7 @@ def ventana_agregar_usuario(tree):
     tk.Label(ventana, text="Firma (PNG):", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.65)
     entry_firma = ttk.Entry(ventana)
     entry_firma.place(relx=0.20, rely=0.65, relwidth=0.35)
-    tk.Button(ventana, text="Seleccionar", command=lambda: seleccionar_firma(entry_firma), font=("Arial", 10,"bold")).place(relx=0.58, rely=0.65, relwidth=0.2)
+    tk.Button(ventana, text="Seleccionar", command=lambda: seleccionar_firma(entry_firma, ventana), font=("Arial", 10,"bold")).place(relx=0.58, rely=0.65, relwidth=0.2)
 
     def guardar():
         nombre = entry_nombre.get()

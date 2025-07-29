@@ -19,6 +19,8 @@ a = Analysis(
     ('gastos_contrato.py', '.'), # Incluye gastos_contrato
     ('main_menu.py', '.'),       # Incluye main_menu
     ('login.py', '.'),		 # Incluye login
+    ('upgrade.py', '.'),         # Incluye upgrade
+    ('version_local.txt', '.'),	 # Incluye version local
     ('Plantillas/*.png', 'Plantillas'),
     ('Plantillas/*.jpeg', 'Plantillas'),
     ('Plantillas/*.ico', 'Plantillas'),
@@ -37,6 +39,7 @@ a = Analysis(
     'main_menu',
     'login',
     'database',
+    'upgrade',
     'mysql',
     'mysql.connector',
     'mysql.connector.locales',
