@@ -1,2 +1,2 @@
 1.1.5
-https://github.com/AlexSilvan12/SistemasATM/releases/download/v1.1.5/Instalador_AppGestor_v1.1.5.exe
+https://github.com/AlexSilvan12/SistemasATM/releases/download/v1.1.6/Instalador_AppGestor_v1.1.6.exe
