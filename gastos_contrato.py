@@ -1,10 +1,9 @@
-
 import tkinter as tk
 import os
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk
-from database import conectar_bd
 from openpyxl import Workbook
+from database import conectar_bd
 from openpyxl.cell.cell import Cell
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -285,6 +284,7 @@ def exportar_reporte_excel(tree, tree_total, nombre_contrato="Todos los contrato
     # Diálogo para guardar archivo
     file_path = filedialog.asksaveasfilename(
         defaultextension=".xlsx",
+        initialdir=os.environ['USERPROFILE'],  # Carpeta personal del usuario
         filetypes=[("Archivos de Excel", "*.xlsx")],
         title="Guardar Reporte de Gastos"
     )

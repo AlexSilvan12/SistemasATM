@@ -9,10 +9,10 @@ os.environ['PATH'] = dll_path + os.pathsep + os.environ['PATH']
 
 def conectar_bd():
     config = {
-        'host':"alejandroapps.duckdns.org",
+        'host':"localhost",
         'port':3306,
-        'user':"administrador",
-        'password':"ATM_4dm1n_25?",
+        'user':"root",
+        'password':"As1lv4n.25!",
         'database':"sistemasolicitudes",
         'raise_on_warnings': True,
         'auth_plugin': 'mysql_native_password'
@@ -24,3 +24,8 @@ def conectar_bd():
     except mysql.connector.Error as e:
         print(f"Error al conectar a la base de datos: {e}")
         return None
+    
+
+#andrewstechapps.ddns-ip.net
+#administrador
+#ATM_4dm1n_25?

@@ -35,7 +35,7 @@ def cargar_proveedores():
             conexion.close()
 
 #Funcion para agregar un nuevo proveedor a la base de datos
-def agregar_proveedor(entry_nombre, entry_rfc, entry_email, entry_clave, entry_cuenta, entry_banco, tree, ventana):
+def agregar_proveedor(entry_nombre, entry_rfc, entry_email, entry_clave, entry_cuenta, entry_banco, tree, ventana, ventana_padre):
     nombre = entry_nombre.get()
     rfc = entry_rfc.get()
     email = entry_email.get()
@@ -44,7 +44,7 @@ def agregar_proveedor(entry_nombre, entry_rfc, entry_email, entry_clave, entry_c
     banco = entry_banco.get()
     
     if not (nombre and rfc and clave and cuenta and banco):
-        messagebox.showwarning("Campos que son obligatorios estan vacíos", "Por favor, llena todos los campos.")
+        messagebox.showwarning("Campos Vacíos", "Por favor, llena todos los campos.", parent=ventana_padre)
         return
     
     conexion = None
@@ -67,12 +67,12 @@ def agregar_proveedor(entry_nombre, entry_rfc, entry_email, entry_clave, entry_c
         #Mensaje de exito al agregar y cargar el proveedor nuevo a la tabla
         messagebox.showinfo("✅Éxito", "Proveedor agregado correctamente.")
         if tree is not None:
-            cargar_proveedores(tree)
+            cargar_proveedores_tree(tree)
             
         ventana.destroy()
 
     except mysql.connector.Error as e:
-        messagebox.showerror(f"❌Error", "Proveedor no agregado", {e})
+        messagebox.showerror(f"❌Error", "Proveedor no agregado", {e}, parent= ventana_padre)
     finally:
         #Cierra el cursor y la conexion si fueron creados correctamente
         if cursor is not None:
@@ -243,7 +243,7 @@ def ventana_agregar_proveedor(tree):
     # Botón Guardar
     tk.Button(ventana, text="Guardar", command=lambda: agregar_proveedor(
             entry_nombre, entry_rfc, entry_email, entry_clave,
-            entry_cuenta, entry_banco, tree, ventana
+            entry_cuenta, entry_banco, tree, ventana, ventana
         ), font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.85 )
     tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.85)
 

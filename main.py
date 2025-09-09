@@ -1,7 +1,9 @@
 import traceback
 import sys
-from upgrade import verificar_actualizacion
-verificar_actualizacion()
+import actualizacion
+
+# Antes de cargar interfaz
+actualizacion.verificar_actualizacion()
 
 def main():
     from login import ventana_login

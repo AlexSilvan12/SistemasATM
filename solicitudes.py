@@ -1,25 +1,43 @@
 import shutil
 import tkinter as tk
 from tkinter import filedialog
+from ControlSolicitudes import Control_Solicitudes
 from gastos_contrato import costos_contrato
 from tkinter import messagebox, ttk
 from PIL import Image, ImageTk
-from datetime import date
+from datetime import date, datetime
 from database import conectar_bd
+from proveedores import cargar_proveedores
 from utils import ruta_relativa, centrar_ventana, convertir_excel_a_pdf, salir
 from login import usuario_actual
 from openpyxl import load_workbook
 import mysql.connector
 import os
+from tkcalendar import DateEntry
 from openpyxl.styles import Alignment, Border, Side
 from openpyxl.drawing.image import Image as ExcelImage
 
 factura_seleccionada = None
+CARPETA_COMPROBANTES = os.path.join(
+            os.environ['USERPROFILE'], 
+            'OneDrive - ATI', 
+            'Documentos de AppGestor', 
+            'Comprobantes de Pago'
+        )
+
+         
+CARPETA_SOLICITUDES = os.path.join(
+    os.environ['USERPROFILE'],
+    'OneDrive - ATI',
+    'Documentos de AppGestor',
+    'Solicitudes de Pago'
+    )
 
 # Función para conectar con las solicitudes almacenadas en la base de datos
 def cargar_solicitudes(tree):
+    # Limpiar datos previos
     for row in tree.get_children():
-        tree.delete(row)  # Limpiar datos previos
+        tree.delete(row)
 
     conexion = None
     cursor = None
@@ -31,10 +49,29 @@ def cargar_solicitudes(tree):
             return
 
         cursor = conexion.cursor()
-        cursor.execute("SELECT id_solicitud, fecha_solicitud, importe, fecha_limite_pago, estado FROM SolicitudesPago WHERE estado = 'Autorizado' OR estado = 'Pendiente'")
+        cursor.execute("""
+            SELECT id_solicitud, fecha_solicitud, importe, fecha_limite_pago, estado, archivo 
+            FROM SolicitudesPago 
+            WHERE estado = 'Autorizado' OR estado = 'Pendiente'
+            ORDER BY id_solicitud ASC
+        """)
+
+        # Configurar tags para colores
+        tree.tag_configure("autorizado", background="#90EE90")  # Verde claro
+        tree.tag_configure("pendiente", background="#FFD580")   # Amarillo claro
+        tree.tag_configure("rechazado", background="#FF7F7F")   # Rojo claro (por si después lo usas)
 
         for solicitud in cursor.fetchall():
-            tree.insert("", "end", values=solicitud)
+            estado = solicitud[4]  # La columna 'estado' está en índice 4
+
+            if estado.lower() == "autorizado":
+                tree.insert("", "end", values=solicitud, tags=("autorizado",))
+            elif estado.lower() == "pendiente":
+                tree.insert("", "end", values=solicitud, tags=("pendiente",))
+            elif estado.lower() == "rechazado":
+                tree.insert("", "end", values=solicitud, tags=("rechazado",))
+            else:
+                tree.insert("", "end", values=solicitud)
 
     except Exception as e:
         print(f"❌ Error al cargar solicitudes de pago: {e}")
@@ -57,7 +94,7 @@ def cargar_autorizaciones(tree):
     WHERE id_autorizacion NOT IN (
         SELECT id_autorizacion FROM SolicitudesPago
     )
-""")
+    """)
         for row in cursor.fetchall():
             tree.insert("", tk.END, values=row)
     except Exception as e:
@@ -66,14 +103,15 @@ def cargar_autorizaciones(tree):
         if cursor: cursor.close()
         if conexion: conexion.close()
 
-def marcar_como_pagado(tree, usuario_actual):
+
+def marcar_como_pagado(tree, usuario_actual, ventana_padre):
     if usuario_actual["rol"] != "Contador":
-        messagebox.showwarning("Acceso denegado", "No tiene permisos para realizar esta acción.")
+        messagebox.showwarning("Acceso denegado", "No tiene permisos para realizar esta acción.", parent=ventana_padre)
         return
 
     seleccion = tree.focus()
     if not seleccion:
-        messagebox.showwarning("Sin selección", "Selecciona una solicitud para marcar como pagada.")
+        messagebox.showwarning("Sin selección", "Selecciona una solicitud para marcar como pagada.", parent=ventana_padre)
         return
 
     valores = tree.item(seleccion, "values")
@@ -82,6 +120,8 @@ def marcar_como_pagado(tree, usuario_actual):
 
     id_solicitud = valores[0]
 
+    conexion = None
+    cursor = None
     try:
         conexion = conectar_bd()
         cursor = conexion.cursor()
@@ -89,42 +129,69 @@ def marcar_como_pagado(tree, usuario_actual):
         cursor.execute("SELECT estado FROM solicitudespago WHERE id_solicitud = %s", (id_solicitud,))
         estado_actual = cursor.fetchone()
         if not estado_actual or estado_actual[0] != "Autorizado":
-            messagebox.showinfo("Información", "La Solicitud de Pago aun no ha sido autorizada.")
+            messagebox.showinfo("Información", "La Solicitud de Pago aun no ha sido autorizada.", parent=ventana_padre)
             return
+
+        # Seleccionar comprobante
+        ruta_archivo = filedialog.askopenfilename(
+            title="Seleccionar comprobante de pago",
+            filetypes=[("Archivos PDF", "*.pdf"), ("Imágenes", "*.jpg;*.jpeg;*.png"), ("Todos los archivos", "*.*")],
+            parent=ventana_padre
+        )
+        if not ruta_archivo:
+            messagebox.showwarning("Cancelado", "No seleccionaste ningún comprobante.", parent=ventana_padre)
+            return
+        
+        # Asegurarnos de que la carpeta base exista
+        if not os.path.exists(CARPETA_COMPROBANTES):
+            os.makedirs(CARPETA_COMPROBANTES)
+
+        extension = os.path.splitext(ruta_archivo)[1]
+        nombre_final = f"Comprobante_{id_solicitud}{extension}"  # Solo el nombre
+        ruta_destino = os.path.join(CARPETA_COMPROBANTES, nombre_final)
 
         hoy = date.today()
 
+        # Guardar solo el nombre del archivo en la BD
         cursor.execute("""
             UPDATE solicitudespago 
-            SET estado = 'Pagado', fecha_pago = %s 
+            SET estado = 'Pagado', fecha_pago = %s, comprobante = %s
             WHERE id_solicitud = %s
-        """, (hoy, id_solicitud))
+        """, (hoy, nombre_final, id_solicitud))  # << Solo nombre_final, NO la ruta completa
+
+        if cursor.rowcount == 0:
+            messagebox.showerror("Error", "No se pudo actualizar la solicitud en la base de datos.", parent=ventana_padre)
+            conexion.rollback()
+            return
+
+        try:
+            shutil.copy2(ruta_archivo, ruta_destino)
+        except Exception as e_file:
+            conexion.rollback()
+            messagebox.showerror("Error", f"No se pudo guardar el comprobante:\n{e_file}", parent=ventana_padre)
+            return
 
         conexion.commit()
-        messagebox.showinfo("✅ Éxito", f"La solicitud {id_solicitud} fue marcada como 'Pagado' el {hoy}.")
 
-        # Opcional: refrescar el treeview si tienes una función como cargar_solicitudes_pendientes()
+        messagebox.showinfo("Éxito", f"La solicitud {id_solicitud} fue marcada como 'Pagado' y se guardó el comprobante.", parent=ventana_padre)
         cargar_solicitudes(tree)
 
     except Exception as e:
-        messagebox.showerror("❌ Error", f"No se pudo actualizar el estado:\n{e}")
+        if conexion: conexion.rollback()
+        messagebox.showerror("Error", f"No se pudo actualizar el estado:\n{e}", parent=ventana_padre)
     finally:
         if cursor: cursor.close()
         if conexion: conexion.close()
 
 # Función principal para generar el Excel desde la selección del Treeview
-def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura):
-    id_solicitud = entry_consecutivo.get().strip()
+def generar_excel_desde_seleccion(tree, entry_concepto, entry_referencia, entry_factura):
+    #id_solicitud = entry_consecutivo.get().strip()
     concepto = entry_concepto.get("1.0", "end").strip()
     referencia_pago = entry_referencia.get().strip()
     global factura_seleccionada
 
     if not factura_seleccionada:
         messagebox.showerror("Error", "Debes seleccionar un archivo PDF como factura.")
-        return
-
-    if not id_solicitud:
-        messagebox.showwarning("Consecutivo vacío", "Debes ingresar un consecutivo para la solicitud.")
         return
 
     selected = tree.selection()
@@ -135,17 +202,13 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
     id_autorizacion = tree.item(selected[0], "values")[0]
 
     try:
+
         conexion = conectar_bd()
         cursor = conexion.cursor()
 
-        cursor.execute("SELECT COUNT(*) FROM SolicitudesPago WHERE id_solicitud = %s", (id_solicitud,))
-        if cursor.fetchone()[0] > 0:
-            messagebox.showwarning("Advertencia", f"Ya existe una solicitud con el ID '{id_solicitud}'. No se generó el Excel ni se guardaron datos.")
-            return
-
         # Obtener datos de la autorización
         cursor.execute("""
-            SELECT fecha_solicitud, monto, instruccion, id_proveedor, fecha_limite_pago, IVA, subtotal
+            SELECT fecha_solicitud, monto, instruccion, id_proveedor, fecha_limite_pago, IVA, subtotal, moneda
             FROM autorizacionescompra 
             WHERE id_autorizacion = %s
         """, (id_autorizacion,))
@@ -154,13 +217,7 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
             messagebox.showerror("Error", "No se encontró la autorización.")
             return
 
-        fecha_solicitud, monto, instruccion, id_proveedor, fechalimite, iva, subtotal = autorizacion
-
-        # Obtener moneda desde la autorización
-        cursor.execute("SELECT moneda FROM autorizacionescompra WHERE id_autorizacion = %s", (id_autorizacion,))
-        moneda = cursor.fetchone()
-        moneda = moneda[0]
-
+        fecha_solicitud, monto, instruccion, id_proveedor, fechalimite, iva, subtotal, moneda = autorizacion
 
         # Obtener datos del proveedor
         cursor.execute("""
@@ -172,6 +229,25 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
         if not proveedor:
             messagebox.showerror("Error", "No se encontró el proveedor.")
             return
+
+    # Insertar en la tabla SolicitudesPago (sin id_solicitud, MySQL lo genera)
+        query = """
+            INSERT INTO SolicitudesPago (
+                id_autorizacion, id_proveedor, fecha_solicitud, 
+                importe, instruccion, referencia_pago, concepto, 
+                fecha_recibido_revision, fecha_limite_pago, num_facturas, estado, IVA, subtotal, moneda
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s, %s, %s)
+        """
+        cursor.execute(query, (
+        id_autorizacion, id_proveedor, fecha_solicitud,
+        monto, instruccion, referencia_pago, concepto, fecha_solicitud, fechalimite,
+        factura, iva, subtotal, moneda   # 🔹 aquí guardamos solo el nombre
+        ))
+
+        conexion.commit()
+        #Obtener id_solicitud
+        id_solicitud = cursor.lastrowid
 
         # Guardar el archivo PDF en la carpeta de facturas con el nombre correcto
         base_onedrive = os.path.join(
@@ -188,26 +264,11 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 
         try:
             shutil.copy(factura_seleccionada, ruta_destino)
-            factura = ruta_destino
+            factura = nombre_archivo   # 🔹 SOLO guardamos el nombre en la BD
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo copiar el archivo: {e}")
             return
-
-        # Insertar en la tabla SolicitudesPago
-        query = """
-            INSERT INTO SolicitudesPago (
-                id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud, 
-                importe, instruccion, referencia_pago, concepto, 
-                fecha_recibido_revision, fecha_limite_pago, num_facturas, estado, IVA, subtotal
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pendiente', %s, %s)
-        """
-        cursor.execute(query, (
-            id_solicitud, id_autorizacion, id_proveedor, fecha_solicitud,
-            monto, instruccion, referencia_pago, concepto, fecha_solicitud, fechalimite, factura, iva, subtotal
-        ))
-        conexion.commit()
-
+        
         # Insertar los contratos asociados
         cursor.execute("SELECT id_contrato, importe FROM Autorizacion_Contratos WHERE id_autorizacion = %s", (id_autorizacion,))
         contratos = cursor.fetchall()
@@ -220,7 +281,6 @@ def generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry
 
         # Limpiar campos y actualizar UI
         messagebox.showinfo("✅ Éxito", f"Solicitud '{id_solicitud}' guardada en la base de datos.")
-        entry_consecutivo.delete(0, tk.END)
         entry_referencia.delete(0, tk.END)
         entry_concepto.delete("1.0", "end")
         entry_factura.config(state="normal")
@@ -246,7 +306,14 @@ def seleccionar_factura(entry_factura):
         messagebox.showwarning("Advertencia", "Ya se ha ingresado un número de factura.")
         return
 
-    ruta_origen = filedialog.askopenfilename(title="Seleccionar Archivo de Factura", filetypes=[("Archivos PDF", "*.pdf")])
+    ruta_origen = filedialog.askopenfilename(
+        title="Seleccionar Factura",
+        initialdir=os.environ['USERPROFILE'],  # Carpeta personal del usuario
+        filetypes=[("Archivos PDF", "*.pdf")]
+    )
+    if not ruta_origen:
+        return
+
     if ruta_origen:
         factura_seleccionada = ruta_origen
         entry_factura.delete(0, tk.END)
@@ -262,7 +329,66 @@ def eliminar_factura(entry_factura):
    entry_factura.delete(0, tk.END)       # Borrar contenido
 
    seleccionar_factura(entry_factura)
-       
+
+def subir_factura_desde_tree(tree_local, ventana_padre):
+
+    selected = tree_local.selection()
+    if not selected:
+        messagebox.showwarning("Advertencia", "Debes seleccionar una solicitud.", parent=ventana_padre)
+        return
+
+    id_solicitud = tree_local.item(selected[0], "values")[0]
+
+    ruta_origen = filedialog.askopenfilename(
+        parent=ventana_padre,
+        title="Seleccionar archivo PDF de factura",
+        initialdir=os.environ['USERPROFILE'],  # Carpeta personal del usuario
+        filetypes=[("Archivos PDF", "*.pdf")]
+    )
+    if not ruta_origen:
+        return
+
+    if not ruta_origen.lower().endswith(".pdf"):
+        messagebox.showerror("Error", "Solo se permiten archivos PDF.", parent=ventana_padre)
+        return
+
+    try:
+        base_onedrive = os.path.join(
+            os.environ['USERPROFILE'],
+            'OneDrive - ATI',
+            'Documentos de AppGestor',
+            'Facturas'
+        )
+        if not os.path.exists(base_onedrive):
+            os.makedirs(base_onedrive)
+
+        nombre_archivo = f"Factura_Solicitud de Pago_{id_solicitud}.pdf"
+        ruta_destino = os.path.join(base_onedrive, nombre_archivo)
+
+        # Eliminar si ya existía
+        if os.path.exists(ruta_destino):
+            os.remove(ruta_destino)
+
+        # Copiar nuevo archivo
+        shutil.copy(ruta_origen, ruta_destino)
+
+        # Actualizar la base de datos
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        cursor.execute("""
+            UPDATE SolicitudesPago
+            SET num_facturas = %s
+            WHERE id_solicitud = %s
+        """, (ruta_destino, id_solicitud))
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        messagebox.showinfo("✅ Éxito", f"Factura actualizada para la solicitud {id_solicitud}.", parent=ventana_padre)
+
+    except Exception as e:
+        messagebox.showerror("Error", f"No se pudo subir la factura:\n{e}", parent=ventana_padre)
+
 # Función que llena la plantilla Excel con los datos
 def generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
                   referencia_pago, fechalimite, concepto, factura, nombre, rfc, email, clave_bancaria, cuenta_bancaria, banco, nombre_usuario, iva, subtotal, moneda):
@@ -326,41 +452,34 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
         if factura.lower().endswith(".pdf"):
             base_onedrive = os.path.join(
                 os.environ['USERPROFILE'],
-                    'OneDrive - ATI',
-                    'Documentos de AppGestor',
-                    'Facturas'
-                    )
-        RUTA_FACTURAS = os.path.join(base_onedrive, os.path.basename(factura))
-
-        from openpyxl.styles import Border, Side
+                'OneDrive - ATI',
+                'Documentos de AppGestor',
+                'Facturas'
+            )
+            RUTA_FACTURAS = os.path.join(base_onedrive, factura)  # 🔹 Usamos el nombre y construimos ruta
+        else:
+            RUTA_FACTURAS = factura
 
         if os.path.exists(RUTA_FACTURAS):
-            nombre_archivo = os.path.basename(factura)
             celda_factura = sheet.cell(row=34, column=3)
-            celda_factura.value = nombre_archivo
+            celda_factura.value = factura  # 🔹 Solo el nombre
             celda_factura.hyperlink = RUTA_FACTURAS
             celda_factura.style = "Hyperlink"
             celda_factura.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            
-            # Bordes a aplicar
-            borde_superior_izquierdo = Border(top=Side(style="thin"), left=Side(style="thin"))
-            borde_superior = Border(top=Side(style="thin"))
-            borde_izquierdo = Border(left=Side(style="thin"))
 
-            # Aplicar bordes a todas las celdas del rango C34:F34 (columnas 3 a 6)
-            for col in range(3, 7):
-                celda = sheet.cell(row=34, column=col)
-                if col == 3:  # celda C34
-                    celda.border = borde_superior_izquierdo
-                elif col == 6:  # última columna F34, solo superior 
-                    celda.border = borde_superior
-                else:  # D34, E34
-                    celda.border = borde_superior
-
-            # Combinar las celdas después de aplicar los bordes
+            # Definir estilo de borde
+            borde_completo = Border(
+                top=Side(style="thin"),
+                bottom=Side(style="thin"),
+                left=Side(style="thin"),
+                right=Side(style="thin")
+            )
             sheet.merge_cells("C34:F34")
+            celda_combinada = sheet["C34"]
+            celda_combinada.border = borde_completo
         else:
             escribir(34, 3, factura, combinar="C34:F34")
+
 
         ruta_firma = ruta_relativa(usuario_actual["firma"])
 
@@ -370,19 +489,26 @@ def generar_excel(id_solicitud, fecha_solicitud, monto, instruccion,
         firma_img.height = 50
         sheet.add_image(firma_img, "D37")
 
-        # Guardar Excel
-        #CARPETA_SOLICITUDES = ruta_relativa("Solicitudes") #Quitar cuando se sincronicen en one drive
-        CARPETA_SOLICITUDES= os.path.join(os.environ['USERPROFILE'], 'App Gestor - ATI', 'Documentos de AppGestor', 'Solicitudes de Pago')
-        #Crear la carpeta si no existe
+        # Crear la carpeta si no existe
         if not os.path.exists(CARPETA_SOLICITUDES):
             os.makedirs(CARPETA_SOLICITUDES)
-            
-        output_path = os.path.join(CARPETA_SOLICITUDES, f"Solicitud de Pago_{id_solicitud}.xlsx")
+
+        # Guardar Excel en carpeta
+        nombre_excel = f"Solicitud de Pago_{id_solicitud}.xlsx"
+        output_path = os.path.join(CARPETA_SOLICITUDES, nombre_excel)
         wb.save(output_path)
 
-        # Convertir a PDF (la función se encarga de abrirlo)
-        ruta_pdf = output_path.replace(".xlsx", ".pdf")
+        # Convertir a PDF
+        nombre_pdf = f"Solicitud de Pago_{id_solicitud}.pdf"
+        ruta_pdf = os.path.join(CARPETA_SOLICITUDES, nombre_pdf)
         convertir_excel_a_pdf(output_path, ruta_pdf)
+
+        # 🔹 Guardar en BD solo el nombre del PDF (no la ruta)
+        cursor.execute(
+            "UPDATE solicitudespago SET archivo = %s WHERE id_solicitud = %s",
+            (nombre_pdf, id_solicitud)
+        )
+        conexion.commit()
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo generar el Excel:\n{e}")
@@ -442,6 +568,215 @@ def mSolicitud_excel(id_autorizacion):
     cursor.close()
     conexion.close()
 
+#Ventana de solicitudes pagadas
+def solicitudes_pagadas(tree, search_text="", fecha_inicio=None, fecha_fin=None, proveedor=None):
+    for row in tree.get_children():
+        tree.delete(row)
+
+    conexion = None
+    cursor = None
+    try:
+        conexion = conectar_bd()
+        if conexion is None:
+            return
+        cursor = conexion.cursor()
+
+        query = """
+            SELECT s.id_solicitud, s.fecha_solicitud, s.fecha_pago, s.importe,
+                   p.nombre, s.estado, s.comprobante
+            FROM solicitudespago s
+            INNER JOIN proveedores p ON s.id_proveedor = p.id_proveedor
+            WHERE s.estado = 'Pagado'
+        """
+        params = []
+
+        if search_text:
+            query += " AND (s.id_solicitud LIKE %s OR p.nombre LIKE %s)"
+            params.extend([f"%{search_text}%", f"%{search_text}%"])
+
+        if fecha_inicio and fecha_fin:
+            query += " AND s.fecha_pago BETWEEN %s AND %s"
+            params.extend([fecha_inicio, fecha_fin])
+
+        if proveedor and proveedor != "Todos":
+            id_proveedor = proveedor.split(" - ")[0]
+            query += " AND p.id_proveedor = %s"
+            params.append(id_proveedor)
+
+        cursor.execute(query, params)
+        for row in cursor.fetchall():
+            tree.insert("", "end", values=row)
+
+    except mysql.connector.Error as e:
+        messagebox.showerror("Error", f"No se pudieron cargar las solicitudes: {e}")
+    finally:
+        if cursor: cursor.close()
+        if conexion: conexion.close()
+
+def ventana_solicitudes_pagadas():
+    ventana = tk.Toplevel()
+    ventana.title("Solicitudes Pagadas")
+    centrar_ventana(ventana, 1200, 600)
+    ventana.configure(bg="white")
+
+    # Canvas para degradado
+    canvas = tk.Canvas(ventana)
+    canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+    def actualizar_degradado(event):
+        ancho = canvas.winfo_width()
+        alto = canvas.winfo_height()
+        crear_degradado_vertical(canvas, ancho, alto, "#8B0000", "#FFFFFF")
+    canvas.bind("<Configure>", actualizar_degradado)
+    ventana.after(100, lambda: actualizar_degradado(None))
+
+    # Frame de filtros
+    frame_filtros = ttk.Frame(canvas, padding=10)
+    frame_filtros.pack(fill="x")
+
+    # --- Filtros ---
+    tk.Label(frame_filtros, text="Proveedor:", font=("Arial", 10, "bold")).pack(side="left", padx=5)
+    combo_proveedor = ttk.Combobox(frame_filtros, width=40, state="readonly")
+    combo_proveedor.pack(side="left", padx=5)
+
+    # Cargar proveedores
+    conexion = conectar_bd()
+    cursor = conexion.cursor()
+    cursor.execute("SELECT DISTINCT nombre FROM proveedores ORDER BY nombre ASC")
+    proveedores = [row[0] for row in cursor.fetchall()]
+    conexion.close()
+    combo_proveedor['values'] = ["Todos los proveedores"] + proveedores
+    combo_proveedor.current(0)
+
+    # Fechas
+    tk.Label(frame_filtros, text="Fecha inicio:").pack(side="left", padx=5)
+    entry_fecha_inicio = DateEntry(frame_filtros, date_pattern='yyyy-mm-dd', width=12,
+                                   background='darkblue', foreground='white', borderwidth=2)
+    entry_fecha_inicio.pack(side="left", padx=5)
+
+    tk.Label(frame_filtros, text="Fecha fin:").pack(side="left", padx=5)
+    entry_fecha_fin = DateEntry(frame_filtros, date_pattern='yyyy-mm-dd', width=12,
+                                background='darkblue', foreground='white', borderwidth=2)
+    entry_fecha_fin.pack(side="left", padx=5)
+
+    # Barra de búsqueda
+    tk.Label(frame_filtros, text="Buscar:").pack(side="left", padx=5)
+    entry_busqueda_var = tk.StringVar()
+    entry_busqueda = ttk.Entry(frame_filtros, textvariable=entry_busqueda_var)
+    entry_busqueda.pack(side="left", padx=5)
+
+    # --- TREEVIEW ---
+    tree = ttk.Treeview(ventana, columns=("id", "fecha_solicitud", "fecha_pago", "importe", "proveedor", "estado", "comprobante"), show="headings", height=15)
+    tree.heading("id", text="No. Solicitud", anchor="center")
+    tree.heading("fecha_solicitud", text="Fecha Solicitud", anchor="center")
+    tree.heading("fecha_pago", text="Fecha Pago", anchor="center")
+    tree.heading("importe", text="Importe", anchor="center")
+    tree.heading("proveedor", text="Proveedor", anchor="center")
+    tree.heading("estado", text="Estado", anchor="center")
+    tree.heading("comprobante", text="Comprobante", anchor="center")
+
+    tree.column("id", width=90, anchor="center")
+    tree.column("fecha_solicitud", width=120, anchor="center")
+    tree.column("fecha_pago", width=120, anchor="center")
+    tree.column("importe", width=100, anchor="center")
+    tree.column("proveedor", width=200, anchor="w")
+    tree.column("estado", width=100, anchor="center")
+    tree.column("comprobante", width=300, anchor="w")
+
+    tree.place(relx=0.03, rely=0.25, relwidth=0.9, relheight=0.6)
+
+    # --- Funciones ---
+    def cargar_solicitudes():
+        """Carga solicitudes según filtros de proveedor y fechas"""
+        for item in tree.get_children():
+            tree.delete(item)
+
+        proveedor = combo_proveedor.get()
+        fecha_inicio = entry_fecha_inicio.get()
+        fecha_fin = entry_fecha_fin.get()
+
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        query = """
+            SELECT sp.id_solicitud, sp.fecha_solicitud, sp.fecha_pago, sp.importe,
+                   p.nombre, sp.estado, sp.comprobante
+            FROM SolicitudesPago sp
+            JOIN proveedores p ON sp.id_proveedor = p.id_proveedor
+            WHERE sp.estado = 'Pagado' AND DATE(sp.fecha_pago) BETWEEN %s AND %s
+        """
+        params = [fecha_inicio, fecha_fin]
+        if proveedor != "Todos los proveedores":
+            query += " AND p.nombre = %s"
+            params.append(proveedor)
+
+        cursor.execute(query, tuple(params))
+        for row in cursor.fetchall():
+            tree.insert("", tk.END, values=row)
+        conexion.close()
+
+    def buscar(*args):
+        termino = entry_busqueda_var.get().strip().lower()
+        for item in tree.get_children():
+            tree.delete(item)
+
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+
+        if termino:
+            consulta = """
+                SELECT sp.id_solicitud, sp.fecha_solicitud, sp.fecha_pago, sp.importe,
+                       p.nombre, sp.estado, sp.comprobante
+                FROM SolicitudesPago sp
+                JOIN proveedores p ON sp.id_proveedor = p.id_proveedor
+                WHERE sp.estado = 'Pagado' AND (
+                    CAST(sp.id_solicitud AS CHAR) LIKE %s OR
+                    CAST(sp.fecha_pago AS CHAR) LIKE %s OR
+                    CAST(sp.importe AS CHAR) LIKE %s OR
+                    LOWER(p.nombre) LIKE %s
+                )
+            """
+            like_termino = f"%{termino}%"
+            params = [like_termino]*4
+        else:
+            cargar_solicitudes()
+            return
+
+        cursor.execute(consulta, tuple(params))
+        for row in cursor.fetchall():
+            tree.insert("", tk.END, values=row)
+        conexion.close()
+
+    # Activar búsqueda en vivo
+    entry_busqueda_var.trace_add("write", buscar)
+
+    # Botón abrir comprobante
+    def abrir_comprobante_sel():
+        item = tree.focus()
+        if not item:
+            messagebox.showwarning("Atención", "Selecciona una solicitud.", parent=ventana)
+            return
+
+        nombre_archivo = tree.item(item, "values")[6]  # Contiene solo el nombre (ej: Comprobante_123.pdf)
+
+        if not nombre_archivo:
+            messagebox.showerror("Error", "No se encontró el nombre del comprobante.", parent=ventana)
+            return
+
+        # Construir la ruta completa en tiempo de ejecución
+        ruta_completa = os.path.join(CARPETA_COMPROBANTES, nombre_archivo)
+
+        if os.path.exists(ruta_completa):
+            os.startfile(ruta_completa)  # Solo para Windows
+        else:
+            messagebox.showerror("Error", f"No se encontró el comprobante en:\n{ruta_completa}", parent=ventana)
+
+    # Botón en la interfaz
+    ttk.Button(frame_filtros, text="Abrir Comprobante", command=abrir_comprobante_sel).pack(side="left", padx=10)
+    ttk.Button(frame_filtros, text="Aplicar Filtros", command=cargar_solicitudes).pack(side="left", padx=10)
+    tk.Button(canvas, text="Salir", command= ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.91, relwidth=0.095, relheight=0.05)
+    
+
+    # Carga inicial
+    cargar_solicitudes()
 
 # Interfaz gráfica
 def hex_a_rgb(hex_color):
@@ -569,11 +904,6 @@ def gestionar_solicitudes(rol,volver_menu_callback):
 
     tk.Label(ventana, text="Ingrese la informacion de la solicitud:", font=("Arial", 12, "bold"), bg="white").place(relx=0.60, rely=0.02)
 
-    # Consecutivo
-    tk.Label(ventana, text="Consecutivo:", font=("Arial", 10, "bold"), bg="white").place(relx=0.60, rely=0.1)
-    entry_consecutivo = tk.Entry(ventana, width=30)
-    entry_consecutivo.place(relx=0.70, rely=0.1)
-
     # Concepto
     tk.Label(ventana, text="Concepto:", font=("Arial", 10, "bold"), bg="white").place(relx=0.60, rely=0.16)
     entry_concepto = tk.Text(ventana, wrap="word", font=("Arial", 10))
@@ -616,7 +946,7 @@ def gestionar_solicitudes(rol,volver_menu_callback):
     def Solicitudes(parent=None):
         ventana_solicitudes = tk.Toplevel(parent) if parent else tk.Toplevel()
         ventana_solicitudes.title("Solicitudes Guardadas")
-        centrar_ventana(ventana_solicitudes, 1100, 600)
+        centrar_ventana(ventana_solicitudes, 1200, 650)  # un poco más grande
 
         #Aplicacion del estilo a la tabla
         style = ttk.Style()
@@ -625,24 +955,74 @@ def gestionar_solicitudes(rol,volver_menu_callback):
         style.map("Treeview.Heading", background=[("!active", "#990000"), ("active", "#990000"), ("pressed", "#990000")],
                 foreground=[("!active", "white"), ("active", "white"), ("pressed", "white")])
 
-        
         frame_tabla = tk.Frame(ventana_solicitudes)
-        frame_tabla.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.75)  # ⬅️ Ajusta tamaño aquí
+        frame_tabla.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.75)
 
-        tree_local = ttk.Treeview(frame_tabla, columns=("ID", "Fecha", "Importe", "Limite de Pago", "Estado"), show="headings")
-        for col in ("ID", "Fecha", "Importe", "Limite de Pago","Estado"):
-            tree_local.heading(col, text=col)
-            tree_local.column(col, width=60, anchor="center")
+        # Agrego columna "Archivo" para guardar el nombre del PDF
+        tree_local = ttk.Treeview(
+            frame_tabla,
+            columns=("ID", "Fecha", "Importe", "Limite de Pago", "Estado", "Archivo"),
+            show="headings"
+        )
 
-        tree_local.place(relx=0, rely=0, relwidth=0.97, relheight=1)  # ⬅️ Ajusta si quieres más separación
+        # Configuración de columnas
+        tree_local.heading("ID", text="No. Solicitud")
+        tree_local.column("ID", width=90, anchor="center")
+
+        tree_local.heading("Fecha", text="Fecha")
+        tree_local.column("Fecha", width=100, anchor="center")
+
+        tree_local.heading("Importe", text="Importe")
+        tree_local.column("Importe", width=100, anchor="center")
+
+        tree_local.heading("Limite de Pago", text="Límite de Pago")
+        tree_local.column("Limite de Pago", width=120, anchor="center")
+
+        tree_local.heading("Estado", text="Estado")
+        tree_local.column("Estado", width=100, anchor="center")
+
+        tree_local.heading("Archivo", text="Solicitud PDF")
+        tree_local.column("Archivo", width=350, anchor="w")  # ⬅️ izquierda porque es un nombre largo
+
+        tree_local.place(relx=0, rely=0, relwidth=0.97, relheight=1)
 
         scrollbar_local = ttk.Scrollbar(frame_tabla, orient="vertical", command=tree_local.yview)
         tree_local.configure(yscrollcommand=scrollbar_local.set)
-        scrollbar_local.place(relx=0.97, rely=0, relwidth=0.03, relheight=1)  # ⬅️ Posición vertical a la derecha
+        scrollbar_local.place(relx=0.97, rely=0, relwidth=0.03, relheight=1)
 
+        # Buscar por ID
         tk.Label(ventana_solicitudes, text="Buscar ID:", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.85)
         entry_busqueda = ttk.Entry(ventana_solicitudes, width=20)
         entry_busqueda.place(relx=0.2, rely=0.85)
+
+        def abrir_solicitud_sel():
+            item = tree_local.focus()
+            if not item:
+                messagebox.showwarning("Atención", "Selecciona una solicitud.", parent=ventana_solicitudes)
+                return
+
+            valores = tree_local.item(item, "values")
+            if not valores or len(valores) < 6:
+                messagebox.showerror("Error", "No se encontró el nombre de la solicitud.", parent=ventana_solicitudes)
+                return
+
+            nombre_archivo = valores[5]  # columna "Archivo"
+            if not nombre_archivo:
+                messagebox.showerror("Error", "No se encontró el nombre del archivo.", parent=ventana_solicitudes)
+                return
+
+            # Construir la ruta completa en tiempo de ejecución
+            ruta_completa = os.path.join(CARPETA_SOLICITUDES, nombre_archivo)
+
+            if os.path.exists(ruta_completa):
+                try:
+                    os.startfile(ruta_completa)  # Windows
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo abrir la solicitud:\n{e}", parent=ventana_solicitudes)
+            else:
+                messagebox.showerror("Error", f"No se encontró la solicitud en:\n{ruta_completa}", parent=ventana_solicitudes)
+        # 📌 También abrir con doble clic en la fila
+        tree_local.bind("<Double-1>", lambda e: abrir_solicitud_sel())
 
         def buscar_solicitud():
             id_buscar = entry_busqueda.get().strip()
@@ -658,21 +1038,38 @@ def gestionar_solicitudes(rol,volver_menu_callback):
                 ventana_solicitudes.focus_force()
                 messagebox.showinfo("No encontrado", f"No se encontró la solicitud con ID {id_buscar}")
 
+        # Botones
         tk.Button(ventana_solicitudes, text="Buscar", command=buscar_solicitud,
-                  font=("Arial", 10, "bold"), bg="#004080", fg="white").place(relx=0.35, rely=0.845)
+                font=("Arial", 10, "bold"), bg="#004080", fg="white").place(relx=0.35, rely=0.845)
 
         tk.Button(ventana_solicitudes, text="Salir", command=ventana_solicitudes.destroy,
                 bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.1, rely=0.92, relwidth=0.08, relheight=0.04)
-        
-        tk.Button(ventana_solicitudes, text="Marcar como Pagado", font=("Arial", 10, "bold"),
-          command=lambda: marcar_como_pagado(tree_local, usuario_actual),
-          bg="#006400", fg="white").place(relx=0.6, rely=0.92, relwidth=0.2, relheight=0.06)
 
+        tk.Button(ventana_solicitudes, text="Marcar como Pagado", font=("Arial", 10, "bold"),
+                command=lambda: marcar_como_pagado(tree_local, usuario_actual, ventana_solicitudes),
+                bg="#006400", fg="white").place(relx=0.6, rely=0.92, relwidth=0.2, relheight=0.06)
+
+        tk.Button(
+            ventana_solicitudes,
+            text="📤Subir/Actualizar Factura",
+            bg="#004080", fg="white",
+            font=("Arial", 10, "bold"),
+            command=lambda: subir_factura_desde_tree(tree_local, ventana_solicitudes)
+        ).place(relx=0.6, rely=0.84, relwidth=0.2, relheight=0.06)
+
+        tk.Button(ventana_solicitudes, text="Control de Soliciudes", command=lambda: Control_Solicitudes(usuario_actual, ventana_solicitudes), font=("Arial", 10, "bold")
+                ).place(relx=0.83, rely=0.92, relwidth=0.15, relheight=0.06)
+
+        tk.Button(ventana_solicitudes, text="Solicitudes Pagadas", bg="green", fg="white",
+                command=lambda: ventana_solicitudes_pagadas(), font=("Arial", 10, "bold")
+                ).place(relx=0.83, rely=0.84, relwidth=0.15, relheight=0.06)
+
+        # Cargar solicitudes en el Treeview
         cargar_solicitudes(tree_local)
 
     # Botones
     tk.Button(ventana, text="Guardar y Generar Docs",
-              command=lambda: generar_excel_desde_seleccion(tree, entry_consecutivo, entry_concepto, entry_referencia, entry_factura), font=("Arial", 10, "bold")
+              command=lambda: generar_excel_desde_seleccion(tree, entry_concepto, entry_referencia, entry_factura), font=("Arial", 10, "bold")
              ).place(relx=0.35, rely=0.91, relwidth=0.18, relheight=0.05)
 
     tk.Button(ventana, text="Solicitudes Guardadas", command=Solicitudes, font=("Arial", 10, "bold")).place(relx=0.75, rely=0.91, relwidth=0.15, relheight=0.05)

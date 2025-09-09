@@ -4,7 +4,8 @@
 
 ¡Gracias por descargar AppGestor!
 
-Este instalador contiene la última versión del sistema para la gestión de autorizaciones y solicitudes de pago.
+Este instalador contiene la última versión del sistema para la gestión de
+autorizaciones de compras y solicitudes de pago.
 
 ──────────────────────────────────────────────────────────────
 📦 Contenido del archivo ZIP:
@@ -15,12 +16,11 @@ Este instalador contiene la última versión del sistema para la gestión de aut
 ──────────────────────────────────────────────────────────────
 🛠 INSTRUCCIONES DE INSTALACIÓN:
 ──────────────────────────────────────────────────────────────
-
-1. Haga doble clic sobre "Instalador_AppGestor.exe"
+1. Haga doble clic sobre "Instalador_AppGestor_v1.1.3.exe"
 2. Siga los pasos del asistente de instalación.
 3. Una vez finalizado, encontrará un acceso directo en el escritorio
    y también en el menú Inicio de Windows.
-
+4.Lea el manual de Usuario que se encuentra en esta carpeta Compartida
 ──────────────────────────────────────────────────────────────
 ⚠ NOTA IMPORTANTE:
 ──────────────────────────────────────────────────────────────

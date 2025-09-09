@@ -1,14 +1,15 @@
 [Setup]
 AppName=AppGestor
-AppVersion=1.1.0
+AppVersion=1.1.5
 DefaultDirName={pf}\AppGestor
 DefaultGroupName=AppGestor
-OutputBaseFilename=Instalador_AppGestor
+OutputBaseFilename=Instalador_AppGestor_v1.1.5
 Compression=lzma
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64
 DisableWelcomePage=no
 SetupIconFile=C:\Users\Maestra Flor\Gestor-Autorizaciones y Pagos\dist\AppGestor\_internal\Plantillas\IconoATM.ico
+PrivilegesRequired=admin
 
 [Files]
 Source: "dist\AppGestor\main.exe"; DestDir: "{app}"; Flags: ignoreversion

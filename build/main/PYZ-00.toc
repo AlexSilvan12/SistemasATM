@@ -1,6 +1,10 @@
 ('C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
  'Pagos\\build\\main\\PYZ-00.pyz',
- [('PIL',
+ [('ControlSolicitudes',
+   'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
+   'Pagos\\ControlSolicitudes.py',
+   'PYMODULE'),
+  ('PIL',
    'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y '
    'Pagos\\venv\\Lib\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),
@@ -326,6 +330,9 @@
   ('_strptime', 'C:\\Program Files\\Python311\\Lib\\_strptime.py', 'PYMODULE'),
   ('_threading_local',
    'C:\\Program Files\\Python311\\Lib\\_threading_local.py',
+   'PYMODULE'),
+  ('actualizacion',
+   'C:\\Users\\Maestra Flor\\Gestor-Autorizaciones y Pagos\\actualizacion.py',
    'PYMODULE'),
   ('argparse', 'C:\\Program Files\\Python311\\Lib\\argparse.py', 'PYMODULE'),
   ('ast', 'C:\\Program Files\\Python311\\Lib\\ast.py', 'PYMODULE'),

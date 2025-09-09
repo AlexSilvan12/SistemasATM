@@ -43,9 +43,10 @@ def agregar_autorizacion(entry_consecutivo, combo_tipo, combo_solicitante, entry
     def seleccionar_cotizacion(consecutivo):
         # Selección del archivo original (cotización)
         ruta_origen = filedialog.askopenfilename(
-            title="Seleccionar archivo de Cotización",
-            filetypes=[("PDF files", "*.pdf")]
-        )
+        title="Seleccionar Cotizacion",
+        initialdir=os.environ['USERPROFILE'],  # Carpeta personal del usuario
+        filetypes=[("Archivos PDF", "*.pdf")]
+        ) 
 
         if ruta_origen:
                 # Ruta base dentro de OneDrive
@@ -825,6 +826,7 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         escribir_celda(32, 2, proveedor, "B32:H32")
         escribir_celda(30, 2, general, "B30:H30")  
         escribir_celda(33, 3, instruccion)
+
         # Concatenar instrucción con cotización y poner enlace
         nombre_archivo = os.path.basename(ruta_cotizacion)
         celda_cotizacion = sheet.cell(row=31, column=2)
@@ -883,18 +885,9 @@ def generar_excel(entry_consecutivo, combo_tipo, combo_solicitante, entry_puesto
         # Firma
         ruta_firma = ruta_relativa(usuario_actual["firma"])
         firma_img = ExcelImage(ruta_firma)
-        firma_img.width = 120
+        firma_img.width = 160
         firma_img.height = 50
         sheet.add_image(firma_img, "B37")
-
-        # Firma
-        ruta_firma = ruta_relativa(usuario_actual["firma"])
-        firma_img = ExcelImage(ruta_firma)
-        firma_img.width = 120
-        firma_img.height = 50
-        fila_firma = 37 
-        sheet.add_image(firma_img, f"B{fila_firma}")
-
 
         # 📁 Guardar archivo Excel
         #CARPETA_AUTORIZACIONES = ruta_relativa("Autorizaciones") #Quitar cuando se sincronicen en one drive
@@ -1242,7 +1235,31 @@ def gestionar_autorizaciones(rol, volver_menu_callback):
             else:
                 tree.column(col, width=70, anchor= "center")
         tree.place(relx=0.05, rely=0.05, relwidth=0.9, relheight=0.8)
-        cargar_autorizaciones(tree)
+
+            # 🔹 Definir colores según estado
+        tree.tag_configure("Autorizado", background="#90EE90")   # Verde claro
+        tree.tag_configure("Pendiente", background="#FFD580")    # Amarillo claro
+        tree.tag_configure("Rechazado", background="#FF7F7F")    # Rojo claro
+        tree.tag_configure("otro", background="#FFFFFF")         # Blanco
+
+        # 🔹 Cargar datos con tags
+        conexion = conectar_bd()
+        cursor = conexion.cursor()
+        cursor.execute("""
+            SELECT id_autorizacion, tipo_solicitud, solicitante, monto, fecha_limite_pago, fecha_solicitud, estado
+            FROM autorizacionescompra
+        """)
+        for fila in cursor.fetchall():
+            estado = fila[-1] if fila[-1] else ""
+            if estado == "Autorizado":
+                tree.insert("", "end", values=fila, tags=("Autorizado",))
+            elif estado == "Pendiente":
+                tree.insert("", "end", values=fila, tags=("Pendiente",))
+            elif estado == "Rechazado":
+                tree.insert("", "end", values=fila, tags=("Rechazado",))
+            else:
+                tree.insert("", "end", values=fila, tags=("otro",))
+        
         #tk.Button(ventana, text="Modificar autorizacion", command=lambda: ventana_modificar(tree), font=("Arial", 10, "bold")).place(relx=0.8, rely=0.91, relwidth=0.15, relheight=0.05)
         tk.Button(ventana, text="Salir", command=ventana.destroy, bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
 
@@ -1261,6 +1278,5 @@ def gestionar_autorizaciones(rol, volver_menu_callback):
     tk.Button(ventana,text="Autorizaciones Guardadas", command=lambda: autorizaciones(tree), font=("Arial", 10, "bold")).place(relx=0.78, rely=0.91, relwidth=0.15, relheight=0.05)
 
     tk.Button(ventana, text="Salir", command= lambda: salir(volver_menu_callback, ventana), bg="red", fg="white", font=("Arial", 10, "bold")).place(relx=0.05, rely=0.91, relwidth=0.095, relheight=0.05)
-
 
     ventana.mainloop()

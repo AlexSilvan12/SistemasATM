@@ -28,8 +28,6 @@ def centrar_ventana(ventana, ancho, alto):
     # Establece la geometría de la ventana con la posición calculada
     ventana.geometry(f"{ancho}x{alto}+{pos_x}+{pos_y}")
 
-
-
 def salir(callback, ventana):
     ventana.destroy()
     callback()

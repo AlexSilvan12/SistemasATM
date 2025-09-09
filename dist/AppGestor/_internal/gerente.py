@@ -25,7 +25,7 @@ def cargar_autorizaciones_pendientes(tree):
             ac.moneda,
             ac.fecha_requerida,
             GROUP_CONCAT(aa.articulo SEPARATOR ', ') AS descripcion,
-            GROUP_CONCAT(aa.observaciones SEPARATOR ', ') AS observaciones
+            ac.generales
         FROM 
             autorizacionescompra ac
         INNER JOIN 
@@ -34,8 +34,9 @@ def cargar_autorizaciones_pendientes(tree):
             articulosautorizacion aa ON ac.id_autorizacion = aa.id_autorizacion
         WHERE 
             ac.estado = 'Pendiente'
+            OR ac.instruccion IN ('tarjeta de debito', 'efectivo')
         GROUP BY 
-            ac.id_autorizacion, ac.tipo_solicitud, ac.solicitante, ac.monto, ac.moneda, ac.fecha_requerida
+            ac.id_autorizacion, ac.tipo_solicitud, ac.solicitante, ac.monto, ac.moneda, ac.fecha_requerida;
         """
 
         cursor.execute(consulta)
@@ -119,7 +120,7 @@ def obtener_total_autorizado(moneda):
         if cursor: cursor.close()
         if conexion: conexion.close()
 
-# Funcion para autorizar las autorizaciones de compras
+# Funcion para autorizar las autorizaciones de compras y solicitudes de pago
 def autorizar_autorizacion_y_solicitud(tree):
     seleccion = tree.selection()
     if not seleccion:
@@ -135,59 +136,64 @@ def autorizar_autorizacion_y_solicitud(tree):
     cursor = conexion.cursor()
 
     try:
-        # Obtener el ID de la solicitud relacionada con la autorización
+        # Obtener el ID de la solicitud relacionada (si existe)
         cursor.execute("""
             SELECT sp.id_solicitud 
-            FROM solicitudespago sp
-            JOIN autorizacionescompra ac ON ac.id_autorizacion = sp.id_autorizacion
+            FROM autorizacionescompra ac
+            LEFT JOIN solicitudespago sp 
+                ON ac.id_autorizacion = sp.id_autorizacion
             WHERE ac.id_autorizacion = %s
         """, (id_autorizacion,))
         resultado = cursor.fetchone()
 
-        if not resultado:
-            raise Exception("No se encontró una solicitud relacionada con esta autorización.")
+        id_solicitud = resultado[0] if resultado else None
 
-        id_solicitud = resultado[0]
-
-        # Autorizar ambas en la base de datos
+        # Autorizar la autorización
         cursor.execute("UPDATE autorizacionescompra SET estado = 'Autorizado' WHERE id_autorizacion = %s", (id_autorizacion,))
-        cursor.execute("UPDATE solicitudespago SET estado = 'Autorizado' WHERE id_solicitud = %s", (id_solicitud,))
+
+        # Autorizar la solicitud si existe
+        if id_solicitud is not None:
+            cursor.execute("UPDATE solicitudespago SET estado = 'Autorizado' WHERE id_solicitud = %s", (id_solicitud,))
+
         conexion.commit()
 
         # Rutas de archivos
         ruta_excel_aut = os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Autorizaciones de Compra', f'Autorizacion_{id_autorizacion}.xlsx')
         ruta_pdf_aut = ruta_excel_aut.replace(".xlsx", ".pdf")
 
-        ruta_excel_sol = os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Solicitudes de Pago', f'Solicitud de Pago_{id_solicitud}.xlsx')
-        ruta_pdf_sol = ruta_excel_sol.replace(".xlsx", ".pdf")
-
         ruta_firma = ruta_relativa(usuario_actual["firma"])
         firma_img = ExcelImage(ruta_firma)
-        firma_img.width = 150
-        firma_img.height = 50
+        firma_img.width = 170
+        firma_img.height = 60
 
         # Agregar firma a archivo de autorización
         if os.path.exists(ruta_excel_aut):
             wb_aut = load_workbook(ruta_excel_aut)
             sheet_aut = wb_aut.active
-            sheet_aut.add_image(firma_img, "G37")
+            sheet_aut.add_image(firma_img, "H37")
             wb_aut.save(ruta_excel_aut)
             convertir_excel_a_pdf(ruta_excel_aut, ruta_pdf_aut)
 
-        # Agregar firma a archivo de solicitud
-        if os.path.exists(ruta_excel_sol):
-            wb_sol = load_workbook(ruta_excel_sol)
-            sheet_sol = wb_sol.active
-            sheet_sol.add_image(firma_img, "I37")
-            wb_sol.save(ruta_excel_sol)
-            convertir_excel_a_pdf(ruta_excel_sol, ruta_pdf_sol)
+        # Agregar firma a archivo de solicitud si existe
+        if id_solicitud is not None:
+            ruta_excel_sol = os.path.join(os.environ['USERPROFILE'], 'OneDrive - ATI', 'Documentos de AppGestor', 'Solicitudes de Pago', f'Solicitud de Pago_{id_solicitud}.xlsx')
+            ruta_pdf_sol = ruta_excel_sol.replace(".xlsx", ".pdf")
 
-        messagebox.showinfo("✅ Autorizado", f"La autorización {id_autorizacion} y su solicitud {id_solicitud} fueron autorizadas correctamente.")
+            if os.path.exists(ruta_excel_sol):
+                wb_sol = load_workbook(ruta_excel_sol)
+                sheet_sol = wb_sol.active
+                sheet_sol.add_image(firma_img, "I37")
+                wb_sol.save(ruta_excel_sol)
+                convertir_excel_a_pdf(ruta_excel_sol, ruta_pdf_sol)
+
+        messagebox.showinfo("✅ Autorizado", f"La Autorización de Compra {id_autorizacion} ha sido autorizada correctamente." + 
+                            (f" La Solicitud de Pago {id_solicitud} también fue autorizada." if id_solicitud else " No hay Solicitud de Pago asociada."))
+
         cargar_autorizaciones_pendientes(tree)
+        obtener_total_autorizado()
 
     except Exception as e:
         messagebox.showerror("Error", f"No se pudo autorizar: {e}")
-        return
 
     finally:
         cursor.close()
@@ -198,15 +204,29 @@ def mostrar_detalles_autorizacion(id_autorizacion):
     cursor = conexion.cursor()
 
     try:
+        # 1️⃣ Obtener "generales" desde autorizacionescompra
         cursor.execute("""
-            SELECT articulo, observaciones
+            SELECT generales
+            FROM autorizacionescompra
+            WHERE id_autorizacion = %s
+        """, (id_autorizacion,))
+        resultado_generales = cursor.fetchone()
+
+        if resultado_generales:
+            generales = resultado_generales[0] if resultado_generales[0] else "Sin observaciones generales."
+        else:
+            generales = "Sin observaciones generales."
+
+        # 2️⃣ Obtener artículos de articulosautorizacion
+        cursor.execute("""
+            SELECT articulo
             FROM articulosautorizacion
             WHERE id_autorizacion = %s
         """, (id_autorizacion,))
         articulos = cursor.fetchall()
 
-        if not articulos:
-            messagebox.showinfo("Sin datos", "No hay artículos registrados para esta autorización.")
+        if not articulos and not generales.strip():
+            messagebox.showinfo("Sin datos", "No hay información registrada para esta autorización.")
             return
 
         # Crear ventana emergente
@@ -218,8 +238,12 @@ def mostrar_detalles_autorizacion(id_autorizacion):
         texto = tk.Text(detalle_ventana, wrap="word", font=("Arial", 11))
         texto.pack(fill="both", expand=True, padx=10, pady=10)
 
-        for art, obs in articulos:
-            texto.insert("end", f"🛒 Artículo: {art}\n📝 Observaciones: {obs}\n\n")
+        # Mostrar Generales primero
+        texto.insert("end", f"📋 Observaciones Generales:\n{generales}\n\n")
+
+        # Luego mostrar artículos
+        for art in articulos:
+            texto.insert("end", f"🛒 Artículo: {art[0]}\n")
 
         texto.config(state="disabled")  # Solo lectura
 

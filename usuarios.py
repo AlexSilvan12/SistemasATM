@@ -291,7 +291,7 @@ def ventana_agregar_usuario(tree):
     entry_firma.place(relx=0.20, rely=0.65, relwidth=0.35)
     tk.Button(ventana, text="Seleccionar", command=lambda: seleccionar_firma(entry_firma, ventana), font=("Arial", 10,"bold")).place(relx=0.58, rely=0.65, relwidth=0.2)
 
-    def guardar():
+    def guardar(ventana_padre):
         nombre = entry_nombre.get()
         email = entry_email.get()
         password = entry_password.get()
@@ -300,14 +300,14 @@ def ventana_agregar_usuario(tree):
         firma = entry_firma.get()
 
         if not all([nombre, email, password, rol, puesto, firma]):
-            messagebox.showwarning("Campos incompletos", "Por favor, llena todos los campos antes de guardar.")
+            messagebox.showwarning("Campos incompletos", "Por favor, llena todos los campos antes de guardar.", parent=ventana_padre)
             return
 
         agregar_usuario(nombre, email, password, rol, puesto, firma, tree)
         ventana.destroy()  
 
     # Botón Guardar
-    tk.Button(ventana, text="Guardar", command=guardar, font=("Arial", 10,"bold"), bg="blue").place(relx=0.4, rely=0.85)
+    tk.Button(ventana, text="Guardar", font=("Arial", 10,"bold"),command= lambda:guardar(ventana), bg="blue").place(relx=0.4, rely=0.85)
 
     tk.Button(ventana, text="Cancelar", command= ventana.destroy, font=("Arial", 10,"bold"), bg="red").place(relx=0.2, rely=0.85)
 

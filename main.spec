@@ -19,7 +19,8 @@ a = Analysis(
     ('gastos_contrato.py', '.'), # Incluye gastos_contrato
     ('main_menu.py', '.'),       # Incluye main_menu
     ('login.py', '.'),		 # Incluye login
-    ('upgrade.py', '.'),         # Incluye upgrade
+    ('actualizacion.py', '.'),   # Incluye actualizacion
+    ('ControlSolicitudes.py', '.'), #Incluye Control de solicitudes
     ('version_local.txt', '.'),	 # Incluye version local
     ('Plantillas/*.png', 'Plantillas'),
     ('Plantillas/*.jpeg', 'Plantillas'),
