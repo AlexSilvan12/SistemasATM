@@ -1,2 +1,2 @@
-1.2.3.3.3
-https://github.com/AlexSilvan12/SistemasATM/releases/download/v1.2.3.3/Instalador_AppGestor_v1.2.3.3.3.exe
+1.2.3.3.2
+https://github.com/AlexSilvan12/SistemasATM/releases/download/v1.2.3.3/Instalador_AppGestor_v1.2.3.3.2.exe
